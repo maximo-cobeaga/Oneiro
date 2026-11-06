@@ -41,7 +41,7 @@ scene 1 "Late order" in diner {
 
 - **Polish and 3D world:** transitions, the `ink` style, walking around furniture, `oneiro new`, 3D props, imported `.obj` models, paper-doll characters and `oneiro doctor`. See [docs/11-polish.md](docs/11-polish.md) and [docs/12-world.md](docs/12-world.md).
 
-New here? Read [QUICKSTART.md](QUICKSTART.md).
+New here? Read [QUICKSTART.md](QUICKSTART.md); to test every tool with your own story, follow [docs/13-first-story.md](docs/13-first-story.md).
 
 ![Oneiro Studio](docs/img/ide-overview.png)
 

@@ -67,3 +67,23 @@ fn the_showcase_compiles_cleanly() {
     assert!(d.is_empty(), "{:?}", d.iter().map(|x| x.render()).collect::<Vec<_>>());
     assert_eq!(ep.scenes[0].transitions.len(), 3);
 }
+
+#[test]
+fn scaffolded_projects_compile_in_both_templates() {
+    use oneiro_core::scaffold::{create_project, folder_name, valid_name, Template};
+    for t in Template::ALL {
+        let dir = std::env::temp_dir().join(format!("oneiro_scaffold_{}_{:?}", std::process::id(), t));
+        let _ = std::fs::remove_dir_all(&dir);
+        create_project(&dir, "My Show", t).unwrap();
+        assert!(create_project(&dir, "again", t).is_err(), "never overwrites");
+        let mut d = vec![];
+        let p = Project::load(&dir, &mut d);
+        let (ep, d2) = oneiro_core::compile(&p, &dir.join("script.onr"), &oneiro_core::lock::Lock::default());
+        d.extend(d2);
+        assert!(d.iter().all(|x| !x.is_error()), "{:?}: {:?}", t, d.iter().map(|x| x.render()).collect::<Vec<_>>());
+        assert!(ep.duration > 0.5);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    assert!(valid_name("Marta_2") && !valid_name("2fast") && !valid_name("a b") && !valid_name(""));
+    assert_eq!(folder_name("  My Great Show! "), "My-Great-Show");
+}

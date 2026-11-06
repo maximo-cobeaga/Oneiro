@@ -1,14 +1,19 @@
 # Quickstart
 
-1. Install [Rust](https://rustup.rs) (stable) and, for mp4 export, [ffmpeg](https://ffmpeg.org) on your PATH.
-2. Build once: `cargo build --release` (the first build takes a few minutes).
-3. Check your machine: `./target/release/oneiro doctor`.
-4. Watch what it can do: `./target/release/oneiro render examples/showcase -o out/showcase.mp4`
-   (then open `out/showcase.mp4`). Add `--preview` for a quick 640x360 version.
-5. Open the studio (editor + live viewport + timeline + AI tab): `cargo run --release -p oneiro-ide -- examples/showcase`
-6. Make your own: `./target/release/oneiro new my-show`, edit `my-show/script.onr`, then
-   `oneiro check my-show` after each change and `oneiro render my-show -o out/my-show.mp4`.
+## The easy way (Windows, no commands)
+1. Install [ffmpeg](https://ffmpeg.org) and put it on your PATH (only needed to export mp4).
+2. Build the program once. In PowerShell, from the project folder:
+   `powershell -ExecutionPolicy Bypass -File tools\package.ps1 -Shortcuts`
+   This builds it, creates `dist\Oneiro\` and puts **Oneiro Studio** on your Desktop and Start Menu.
+3. From now on just double-click **Oneiro Studio**. Pick *New project*, *Open project* or an example.
+4. Follow [docs/13-first-story.md](docs/13-first-story.md) to make a story from scratch and try every tool.
+
+You can copy the `dist\Oneiro` folder anywhere (it is self-contained: program, command-line tool, examples, docs).
+
+## The developer way
+`cargo build --release`, then `.\target\release\oneiro.exe doctor`, `render examples\showcase -o out\showcase.mp4`,
+`new my-show [--template empty]`, and `cargo run --release -p oneiro-ide -- examples\showcase`.
 
 Other examples: `examples/first_short` (the diner short with voices), `examples/style_gallery` (mixed styles),
-`examples/toon3d_demo` (3D characters with capes and tails), `examples/models_demo` (imported .obj props).
-Voices: `oneiro voice my-show --provider sapi` (Windows, offline). Language reference: `docs/01-language-spec.md`.
+`examples/toon3d_demo` (3D characters with capes and tails), `examples/models_demo` (imported .obj props),
+`examples/showcase` (nearly everything at once). Language reference: `docs/01-language-spec.md`.

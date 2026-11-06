@@ -28,6 +28,7 @@ impl App {
         let mut open_doc: Option<std::path::PathBuf> = None;
         let mut pick_char: Option<String> = None;
         let mut new_char = false;
+        let mut quick: Option<crate::welcome::QuickKind> = None;
         let mut open_studio = false;
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -37,6 +38,9 @@ impl App {
                     if ui.selectable_label(*s == active_script, label).clicked() {
                         open_script = Some(s.clone());
                     }
+                }
+                if ui.button("+ New episode").clicked() {
+                    quick = Some(crate::welcome::QuickKind::Episode);
                 }
             });
             egui::CollapsingHeader::new(RichText::new("Characters").strong()).default_open(true).show(ui, |ui| {
@@ -91,6 +95,9 @@ impl App {
                     }
                     ui.add_space(4.0);
                 }
+                if ui.button("+ New set").clicked() {
+                    quick = Some(crate::welcome::QuickKind::Set);
+                }
             });
             egui::CollapsingHeader::new(RichText::new("Sounds").strong()).default_open(false).show(ui, |ui| {
                 if sounds.is_empty() {
@@ -135,6 +142,9 @@ impl App {
             self.builder.select(self.ws.as_ref(), &n);
             self.sel_actor = Some(n);
             self.right_tab = RightTab::Character;
+        }
+        if let Some(k) = quick {
+            self.start_quick(k);
         }
         if open_studio {
             self.right_tab = RightTab::Audio;
