@@ -145,6 +145,14 @@ impl Toolbox {
                 description: "Builds the final soundtrack of the saved script and reports its peak and loudness (dBFS), how many voices, effects and music tracks it has, and warnings (limiter engaged, too quiet). Optionally writes it to a WAV.",
                 schema: json!({"type": "object", "properties": {"output": {"type": "string", "description": "Optional path of a WAV to write."}}}),
             },            ToolDef {
+                name: "write_character_parts",
+                description: "Creates a character DRAWN as vector parts (see the guide's 'vector characters' section): validates the `character` source and the four SVG parts (head, body, arm, leg) with the real engine, saves the SVGs to library/parts/<Name>/ and the character to library/characters/<Name>.onchar. Returns every problem found so you can fix and call it again. Render a still afterwards to look at the result.",
+                schema: json!({"type": "object", "properties": {
+                    "source": {"type": "string", "description": "A `character Name { ... }` block (the `parts` block may omit `file`)."},
+                    "svgs": {"type": "object", "description": "SVG text per part.", "properties": {"head": {"type": "string"}, "body": {"type": "string"}, "arm": {"type": "string"}, "leg": {"type": "string"}}, "required": ["head", "body", "arm", "leg"]}
+                }, "required": ["source", "svgs"]}),
+            },
+            ToolDef {
                 name: "write_character",
                 description: "Validates a `character` definition (see the guide) and saves it to library/characters/<Name>.onchar. The name inside the source decides the file name.",
                 schema: json!({"type": "object", "properties": {"source": {"type": "string", "description": "A complete `character Name { ... }` block."}}, "required": ["source"]}),
@@ -193,6 +201,8 @@ impl Toolbox {
                 let mut s = guide::system_prompt(&l.project, Mode::Scene);
                 s.push_str("\n\n");
                 s.push_str(guide::CHARACTER_GUIDE);
+                s.push_str("\n\n");
+                s.push_str(guide::PARTS_GUIDE);
                 s.push_str("\n\n## Tools\nUse check_script after every change, contact_sheet / render_still to look at the result, write_script to save, write_character to create characters.\n");
                 Ok(ToolOutput::ok(s))
             }
@@ -417,7 +427,24 @@ impl Toolbox {
                     s.push_str(&format!(" Wrote {}.", out));
                 }
                 Ok(ToolOutput::ok(s))
-            }            other => Err(format!("unknown tool '{}'", other)),
+            }            "write_character_parts" => {
+                let source = args.get("source").and_then(|s| s.as_str()).ok_or("`source` is required")?;
+                let svgs: std::collections::BTreeMap<String, String> = args
+                    .get("svgs")
+                    .and_then(|o| o.as_object())
+                    .ok_or("`svgs` is required: an object with head, body, arm and leg")?
+                    .iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect();
+                match crate::parts::validate_parts(source, &svgs) {
+                    Ok((def, src, files)) => {
+                        let path = crate::parts::save_files(&self.root, &def.name, &src, &files)?;
+                        Ok(ToolOutput::ok(format!("Saved {} and {} SVG parts. Use it with `use character {}` and look at it with render_still.", path.display(), files.len(), def.name)))
+                    }
+                    Err(diags) => Ok(ToolOutput::err(format!("Not saved. Problems:\n{}", diags.iter().filter(|d| d.is_error()).map(|d| d.render()).collect::<Vec<_>>().join("\n")))),
+                }
+            }
+            other => Err(format!("unknown tool '{}'", other)),
         }
     }
 }

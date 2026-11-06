@@ -7,10 +7,12 @@ pub mod config;
 pub mod director;
 pub mod guide;
 pub mod mcp;
+pub mod parts;
 pub mod providers;
 pub mod tools;
 pub mod types;
 
 pub use config::{AiConfig, ProviderKind};
 pub use director::{direct_character, direct_scene, CharacterResult, DirectorOpts, ProjectCtx, SceneResult, Turn};
+pub use parts::{direct_character_parts, validate_parts, PartsResult};
 pub use types::{ChatRequest, ChatResponse, Message, Provider, Role};

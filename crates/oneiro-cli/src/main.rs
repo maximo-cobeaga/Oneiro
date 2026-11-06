@@ -34,7 +34,7 @@ USAGE:
   oneiro guide [project]                        write docs/ai/guide.md (language guide + library) for AI tools
   oneiro ai-test [--provider P] [--model M]     check that an AI provider answers
   oneiro ai <project> <request> [--provider claude-cli|codex-cli|anthropic|openai|custom-cli] [--model M]
-        [--base-url URL] [--key-env VAR] [--command <cmd args>] [--self-check] [--rounds N] [--character] [--apply]
+        [--base-url URL] [--key-env VAR] [--command <cmd args>] [--self-check] [--rounds N] [--character [--svg]] [--apply]
 
 NOTES:
   render also writes <script>.onlock (resolved camera/placement coordinates) and state.out.
@@ -392,7 +392,9 @@ fn cmd_vocab(args: &[String]) -> Result<bool, String> {
         ("rigs", RIGS.to_vec()),
         ("wardrobe", wardrobe),
         ("props", PROP_KINDS.to_vec()),
-        ("styles", vec!["cutout_2d"]),
+        ("styles", STYLES.to_vec()),
+        ("styles_planned", PLANNED_STYLES.to_vec()),
+        ("svg_parts", SVG_PARTS.to_vec()),
     ];
     if json {
         let items: Vec<String> = groups

@@ -135,7 +135,9 @@ impl<'a> Painter<'a> {
     pub fn shape(&mut self, path: &Path, c: Rgb) {
         self.fill(path, c);
         let ow = self.ow;
-        self.stroke_black(path, ow);
+        if ow > 0.0 {
+            self.stroke_black(path, ow);
+        }
     }
 
     pub fn circle(&mut self, cx: f32, cy: f32, r: f32, c: Rgb) {
@@ -167,7 +169,9 @@ impl<'a> Painter<'a> {
         pb.line_to(b.0, b.1);
         if let Some(p) = pb.finish() {
             let ow = self.ow;
-            self.stroke_black(&p, r * 2.0 + ow * 1.6);
+            if ow > 0.0 {
+                self.stroke_black(&p, r * 2.0 + ow * 1.6);
+            }
             self.stroke(&p, c, r * 2.0);
         }
     }
@@ -201,6 +205,31 @@ impl<'a> Painter<'a> {
         }
         pb.close();
         pb.finish()
+    }
+
+    /// Filled polygon without outline.
+    pub fn fill_poly(&mut self, pts: &[(f32, f32)], c: Rgb) {
+        if let Some(p) = Self::poly_path(pts) {
+            self.fill(&p, c);
+        }
+    }
+
+    /// Fill with a straight-alpha color (used for vector parts); the scene tint still applies.
+    pub fn fill_rgba(&mut self, path: &Path, c: [u8; 4]) {
+        let mut p = Paint::default();
+        p.anti_alias = true;
+        let col = self.color(Rgb(c[0], c[1], c[2]));
+        p.set_color_rgba8((col.red() * 255.0).round() as u8, (col.green() * 255.0).round() as u8, (col.blue() * 255.0).round() as u8, c[3]);
+        self.pm.fill_path(path, &p, FillRule::Winding, self.tf, None);
+    }
+
+    pub fn stroke_rgba(&mut self, path: &Path, c: [u8; 4], width: f32) {
+        let mut p = Paint::default();
+        p.anti_alias = true;
+        let col = self.color(Rgb(c[0], c[1], c[2]));
+        p.set_color_rgba8((col.red() * 255.0).round() as u8, (col.green() * 255.0).round() as u8, (col.blue() * 255.0).round() as u8, c[3]);
+        let s = Stroke { width, line_cap: LineCap::Round, line_join: LineJoin::Round, ..Default::default() };
+        self.pm.stroke_path(path, &p, &s, self.tf, None);
     }
 
     pub fn poly(&mut self, pts: &[(f32, f32)], c: Rgb) {

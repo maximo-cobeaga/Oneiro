@@ -41,11 +41,13 @@ Planned layout:
 
 ## 3. Rendering
 
-- **puppet2d** (MVP): bone-driven cutout pieces with depth layers, parallax camera, optional normal-lit shading
-  for a 3D look. Runs on CPU; GPU accelerates.
-- **Post styles** (`stop_motion`, `ink`) operate on any frame source: frame decimation, boil, grain, texture.
+- **Per-character styles (Phase 5)**: each character is drawn by its own drawer, chosen by `def.style` - `cutout_2d`
+  (library blocks), `rubber_hose` (noodle limbs on a shared skeleton, `pose.rs`), vector puppets (`puppet.rs`, SVG parts) - and
+  `clay` is a post-process on any of them (layer, silhouette-as-height-map lighting, attached texture, stop-motion on twos).
+  Runs on CPU.
+- **Whole-frame post styles** (`ink`, grain) operate on any frame source and are still planned.
 - **toon3d** (later): wgpu, cel shading + outlines. Same scene model, same anchors.
-- **Compositor**: renders each character with its own style into a layer with depth, then merges by depth.
+- **Compositor**: characters are drawn back to front with the set; `clay` characters go through a transparent layer first.
 
 ## 4. AI layer
 
@@ -65,7 +67,7 @@ render preview frame, return screenshot), so the AI can see its own output and s
 | Tier | Phase | Description |
 |---|---|---|
 | A. Block builder | MVP | Assemble parts from libraries with parameters; AI picks and tunes |
-| B. AI-authored vector parts | after MVP | AI writes SVG parts from style templates; validator checks bounds, pivots, layering |
+| B. AI-authored vector parts | **Done (Phase 5)** | AI writes four SVG parts; the engine validates them (viewBox, pivots, safe subset) and rigs them into a puppet with a procedural lip-synced face. See 08-styles.md |
 | C. Hybrid cutter | later | See below |
 
 ### C — Hybrid cutter (design)

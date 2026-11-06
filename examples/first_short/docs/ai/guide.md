@@ -67,6 +67,9 @@ scene 1 "Late order" in diner {
   [fade_in 2s] [fade_out 2s] [once]` starts a looping track from library/music/NAME.wav (a new `music` crossfades the
   previous one); `music stop [fade_out 2s]` ends it. Music ducks automatically under dialogue. Use only sounds from the
   list below; when you need one that is missing, create it first (the `generate_sound` tool, or `oneiro sound`).
+- Styles are per character: `style default: cutout_2d` sets the episode's look, and `use character Blob style rubber_hose`
+  draws that one character differently (cutout_2d, rubber_hose, clay). Different styles can share a scene. Only change
+  styles when the user asks for a look.
 - Floor points `(x, z)` in meters are valid targets: `Blob walks_to (1.5, 0.5)` (x east, z north, origin at the
   center of the set, whose size is given below).
 - Characters keep their positions between statements: after `Blob walks_to diner.counter` Blob stays there.
@@ -139,7 +142,7 @@ Rules:
 - Manner words: slowly, quickly, calmly, angrily, happily, nervously, sadly
 - Heads: round, square, oval; eyes: dots, ovals, wide; bodies: kid, adult, round
 - Wardrobe items: red_beanie, green_hat, yellow_hat, chef_hat, blue_coat, yellow_jacket, orange_parka, green_sweater, brown_jacket, apron_white, jeans, brown_pants, gray_pants, black_shoes, red_scarf
-- Visual styles available: cutout_2d
+- Visual styles (chosen per character: `use character X style S` in the script, or `style: S` in the character file): cutout_2d, rubber_hose, clay
 
 ## Project library
 

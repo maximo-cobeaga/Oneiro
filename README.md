@@ -23,7 +23,7 @@ scene 1 "Late order" in diner {
 }
 ```
 
-## Status: Phases 0-4 done (language, CLI renderer, IDE, AI integration, audio studio)
+## Status: Phases 0-5 done (language, CLI renderer, IDE, AI integration, audio studio, styles)
 
 - **Language + CLI:** parser, solver, CPU renderer, lipsync and mp4 export in the `cutout_2d` (South Park-like) style, on CPU only.
 - **Oneiro Studio (IDE):** live viewport, script editor with diagnostics, timeline, library, block-based character builder,
@@ -33,7 +33,9 @@ scene 1 "Late order" in diner {
 
 - **Audio studio:** record or import voices, generate them with Windows speech / ElevenLabs / local TTS servers, built-in SFX and music generators, music that loops and ducks under dialogue, synchronized playback in the IDE. See [docs/07-audio.md](docs/07-audio.md).
 
-Next: more styles (Phase 5), the hybrid cutter, then 3D. See [docs/04-roadmap.md](docs/04-roadmap.md).
+- **Styles:** `cutout_2d`, `rubber_hose` and `clay`, chosen per character so one scene can mix them, plus **vector characters** drawn as SVG parts (by hand or by an AI) that Oneiro rigs, animates and lip-syncs. See [docs/08-styles.md](docs/08-styles.md).
+
+Next: the hybrid cutter (tier C: from an image to a rigged character), then 3D. See [docs/04-roadmap.md](docs/04-roadmap.md).
 
 ![Oneiro Studio](docs/img/ide-overview.png)
 
@@ -83,6 +85,8 @@ value) and `state.out` (story state).
 | [docs/05-ide.md](docs/05-ide.md) | Oneiro Studio: layout, workflows, record motion, pinning |
 | [docs/06-ai.md](docs/06-ai.md) | AI director, providers, MCP server, what was verified |
 | [docs/07-audio.md](docs/07-audio.md) | Audio studio: voices, SFX, music, mixing, IDE tab, commands |
+| [docs/08-styles.md](docs/08-styles.md) | Styles per character, vector (SVG) characters, AI-drawn characters |
+| [examples/style_gallery/](examples/style_gallery/) | Hybrid and clay episodes, vector characters |
 | [examples/first_short/](examples/first_short/) | The Phase 1 example project |
 
 ## File extensions

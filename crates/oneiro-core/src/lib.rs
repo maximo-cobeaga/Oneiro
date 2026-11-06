@@ -7,11 +7,12 @@ pub mod defs;
 pub mod lock;
 pub mod math;
 pub mod project;
+pub mod svg;
 pub mod timeline;
 
 pub use camera::{CameraPose, CameraSeg};
 pub use compile::{compile, compile_source, AudioEvent, AudioKind, Episode, Scene, StateLog, StmtSpan};
-pub use defs::{Anchor, CharacterDef, Dims, PartDef, PropInst, SetDef};
+pub use defs::{Anchor, CharacterDef, Dims, PartDef, PropInst, SetDef, SvgPart, SvgRig};
 pub use math::Rgb;
 pub use project::{Manifest, Project};
 pub use timeline::{ActorFrame, ActorTimeline};

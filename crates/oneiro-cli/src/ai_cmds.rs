@@ -12,10 +12,11 @@ struct AiArgs {
     cfg: oneiro_ai::AiConfig,
     apply: bool,
     character: bool,
+    svg: bool,
 }
 
 fn parse_ai_args(args: &[String], need_request: bool) -> Result<AiArgs, String> {
-    let mut a = AiArgs { project: String::new(), request: String::new(), cfg: oneiro_ai::AiConfig::load(), apply: false, character: false };
+    let mut a = AiArgs { project: String::new(), request: String::new(), cfg: oneiro_ai::AiConfig::load(), apply: false, character: false, svg: false };
     let mut positional: Vec<String> = Vec::new();
     let mut i = 0;
     while i < args.len() {
@@ -39,6 +40,10 @@ fn parse_ai_args(args: &[String], need_request: bool) -> Result<AiArgs, String> 
             "--self-check" => a.cfg.self_check = true,
             "--apply" => a.apply = true,
             "--character" => a.character = true,
+            "--svg" => {
+                a.character = true;
+                a.svg = true;
+            }
             "--save-config" => {
                 a.cfg.save()?;
                 eprintln!("saved {}", oneiro_ai::config::config_path().display());
@@ -85,7 +90,34 @@ pub fn cmd_ai(args: &[String]) -> Result<bool, String> {
     let opts = oneiro_ai::DirectorOpts { max_rounds: a.cfg.max_rounds, self_check: a.cfg.self_check, ..Default::default() };
     let mut progress = |m: &str| eprintln!("  {}", m);
     eprintln!("provider: {}", provider.name());
-    if a.character {
+    if a.svg {
+        let r = oneiro_ai::direct_character_parts(provider.as_ref(), &project, &a.request, &[], &opts, &mut progress)?;
+        println!("{}", r.reply);
+        match (&r.def, &r.source) {
+            (Some(_), Some(src)) => {
+                println!("
+{}", src);
+                for (rel, svg) in &r.svgs {
+                    println!("
+# {} ({} bytes)", rel, svg.len());
+                }
+                if a.apply {
+                    let path = r.save(&root)?;
+                    eprintln!("saved {} and {} SVG parts", path.display(), r.svgs.len());
+                } else {
+                    eprintln!("(not saved: add --apply to write it to the library)");
+                }
+                Ok(true)
+            }
+            _ => {
+                for d in &r.diagnostics {
+                    eprintln!("{}", d.render());
+                }
+                eprintln!("no valid vector character after {} round(s)", r.rounds);
+                Ok(false)
+            }
+        }
+    } else if a.character {
         let r = oneiro_ai::direct_character(provider.as_ref(), &project, &a.request, &[], &opts, &mut progress)?;
         println!("{}", r.reply);
         match (&r.def, &r.source) {

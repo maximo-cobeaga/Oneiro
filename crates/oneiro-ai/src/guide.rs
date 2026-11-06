@@ -9,6 +9,8 @@ use std::path::Path;
 pub enum Mode {
     Scene,
     Character,
+    /// A character drawn as four SVG parts (tier B).
+    Parts,
 }
 
 pub const LANGUAGE_GUIDE: &str = r#"# Oneiro language guide
@@ -78,6 +80,9 @@ scene 1 "Late order" in diner {
   [fade_in 2s] [fade_out 2s] [once]` starts a looping track from library/music/NAME.wav (a new `music` crossfades the
   previous one); `music stop [fade_out 2s]` ends it. Music ducks automatically under dialogue. Use only sounds from the
   list below; when you need one that is missing, create it first (the `generate_sound` tool, or `oneiro sound`).
+- Styles are per character: `style default: cutout_2d` sets the episode's look, and `use character Blob style rubber_hose`
+  draws that one character differently (cutout_2d, rubber_hose, clay). Different styles can share a scene. Only change
+  styles when the user asks for a look.
 - Floor points `(x, z)` in meters are valid targets: `Blob walks_to (1.5, 0.5)` (x east, z north, origin at the
   center of the set, whose size is given below).
 - Characters keep their positions between statements: after `Blob walks_to diner.counter` Blob stays there.
@@ -138,6 +143,60 @@ Rules:
 - Be faithful to the user's description; make unspecified choices that fit the character's personality.
 "#;
 
+/// How to author a character from vector parts (tier B).
+pub const PARTS_GUIDE: &str = r##"# Oneiro vector characters (drawn parts)
+
+Instead of library blocks you can DRAW a character: four SVG parts that Oneiro assembles into a puppet, animates
+(walking, gestures, turning) and gives a face (eyes, eyebrows, lip-synced mouth). Reply with ONE `character` block
+and FOUR svg blocks, each marked with its part name.
+
+```onchar
+character Pip {
+  rig: library.rigs.biped_cutout
+  build {
+    body: library.bodies.kid { height: 1.0 }
+  }
+  parts {
+    head { height: 0.30, pivot: (0.5, 0.97) }
+    body { height: 0.33, pivot: (0.5, 0.97) }
+    arm  { height: 0.30, pivot: (0.5, 0.08) }
+    leg  { height: 0.36, pivot: (0.5, 0.04) }
+    face { mode: auto, x: 0.5, y: 0.56, scale: 1 }
+  }
+  voice { provider: file, pitch: 300 }
+  sheet { age: 3, traits: [curious], notes: "One or two sentences." }
+}
+```
+
+```svg head
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 90">
+  <rect x="9" y="14" width="82" height="74" rx="22" fill="#8fc3ee" stroke="#1b2a3a" stroke-width="3.5"/>
+</svg>
+```
+(and the same for `svg body`, `svg arm`, `svg leg`)
+
+Part rules (the engine checks every one and tells you what is wrong):
+- Each part is a standalone SVG with a `viewBox` and the drawing FILLING that viewBox (use at least 50% of its height,
+  keep everything inside it, margins small). The renderer scales the whole viewBox to the part's `height`, which is a
+  FRACTION of the character's total height (head 0.22-0.32, body 0.28-0.38, arm 0.25-0.35, leg 0.30-0.42; head + body +
+  leg should add up to about 1.0).
+- `head`: drawn WITHOUT eyes, eyebrows or mouth when `face { mode: auto }` (Oneiro draws them at `x`,`y` = where the
+  middle of the face is, 0..1 from the top-left of the head; `scale` 0.5-1.5 sizes the face). Use `face { mode: none }`
+  only if the head drawing already contains its own face. Draw the head facing the viewer, hair and ears included.
+- `body`: the torso seen from the front, wider than the neck; its bottom edge is the hips.
+- `arm`: ONE arm hanging straight down, a TALL viewBox (for example `0 0 24 100`), hand at the bottom. The same drawing
+  is used for both arms. Pivot = the shoulder (top, `pivot: (0.5, 0.08)`).
+- `leg`: ONE leg with the shoe/foot at the bottom, a tall viewBox (for example `0 0 30 100`). Pivot = the hip.
+- `pivot` is (x, y) from 0 to 1 inside the viewBox: the joint the part turns around (head and body: bottom center,
+  `(0.5, 0.97)`).
+- Allowed SVG: `svg g path rect circle ellipse line polyline polygon` with `fill`, `stroke`, `stroke-width`,
+  `opacity`, `transform`. Colors as `#RRGGBB`. NOT allowed: gradients, filters, text, images, `use`, scripts, CSS, clip
+  paths, masks. Keep it simple and bold: flat colors and a dark outline (stroke 3-4 units) read best on screen.
+- Do not write `file:` in `parts`: Oneiro saves the SVGs for you. Names: a capital letter, then letters, digits or
+  underscores.
+- `style: clay` or `style: rubber_hose` on the character is optional (see the vocabulary for styles).
+"##;
+
 pub fn vocabulary_text() -> String {
     let join = |v: &[&str]| v.join(", ");
     let mut s = String::from("## Vocabulary (the only words the engine accepts)\n\n");
@@ -153,7 +212,10 @@ pub fn vocabulary_text() -> String {
     s.push_str(&format!("- Manner words: {}\n", join(MANNER_WORDS)));
     s.push_str(&format!("- Heads: {}; eyes: {}; bodies: {}\n", join(HEADS), join(EYES), join(BODIES)));
     s.push_str(&format!("- Wardrobe items: {}\n", wardrobe_names().join(", ")));
-    s.push_str(&format!("- Visual styles available: cutout_2d\n"));
+    s.push_str(&format!(
+        "- Visual styles (chosen per character: `use character X style S` in the script, or `style: S` in the character file): {}\n",
+        STYLES.join(", ")
+    ));
     s
 }
 
@@ -180,12 +242,14 @@ pub fn library_summary(project: &Project) -> String {
     }
     for c in project.characters.values() {
         s.push_str(&format!(
-            "- {}: {} body, height {:.2} m, wardrobe [{}], traits [{}]{}\n",
+            "- {}: {} body, height {:.2} m, wardrobe [{}], traits [{}]{}{}{}\n",
             c.name,
             c.body.kind,
             c.height(),
             c.wardrobe.join(", "),
             c.traits.join(", "),
+            if c.style.is_empty() { String::new() } else { format!(", own style {}", c.style) },
+            if c.has_svg() { ", drawn from vector parts".to_string() } else { String::new() },
             if c.notes.is_empty() { String::new() } else { format!(", notes: {}", c.notes) }
         ));
     }
@@ -263,6 +327,10 @@ pub fn system_prompt(project: &Project, mode: Mode) -> String {
             s.push_str("You are the character designer inside Oneiro, a language and studio for animated series. You create characters from library blocks.\n\n");
             s.push_str(CHARACTER_GUIDE);
         }
+        Mode::Parts => {
+            s.push_str("You are the character illustrator inside Oneiro, a language and studio for animated series. You DRAW characters as SVG parts.\n\n");
+            s.push_str(PARTS_GUIDE);
+        }
     }
     s.push('\n');
     s.push_str(&vocabulary_text());
@@ -276,6 +344,9 @@ pub fn system_prompt(project: &Project, mode: Mode) -> String {
         ),
         Mode::Character => s.push_str(
             "Reply with at most two short sentences describing the design, then exactly ONE fenced block marked ```onchar containing the complete `character` definition.\n",
+        ),
+        Mode::Parts => s.push_str(
+            "Reply with at most two short sentences describing the design, then exactly ONE fenced block marked ```onchar with the `character` definition and FOUR fenced blocks marked ```svg head, ```svg body, ```svg arm and ```svg leg. Nothing else.\n",
         ),
     }
     s

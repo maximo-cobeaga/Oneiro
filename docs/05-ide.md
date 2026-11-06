@@ -75,6 +75,10 @@ expression and mouth shape, can talk (cycles visemes) and walk in place. **Save 
 
 ![Character builder](img/ide-character-builder.png)
 
+**Style** (per character): `(episode default)`, `cutout_2d`, `rubber_hose` or `clay`; the preview shows it. Characters drawn from
+vector parts show a note and keep their own proportions. In the AI tab, *Design a character* has a *Draw it as vector parts (SVG)*
+option; the proposal is saved to the library with its SVG files (see [08-styles.md](08-styles.md)).
+
 ## Rendering from the IDE
 
 **File > Render mp4** (preview 640x360, HD 720p or Full HD 1080p) renders in a background thread with a progress bar

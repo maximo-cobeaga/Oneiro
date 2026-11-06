@@ -322,22 +322,39 @@ pub fn compile_source(project: &Project, label: &str, src: &str, lock: &Lock) ->
         }
     }
 
-    // Style support check.
-    let style = file.default_style.clone().unwrap_or_else(|| project.manifest.default_style.clone());
-    if style != "cutout_2d" {
-        let planned = ["rubber_hose", "clay", "toon_3d"];
-        let (msg, sugg) = if planned.contains(&style.as_str()) {
+    // Style support check (episode default and every `use character X style Y`).
+    let style_error = |style: &str, pos: Pos, diags: &mut Vec<Diagnostic>| {
+        if STYLES.contains(&style) {
+            return;
+        }
+        let (msg, sugg) = if PLANNED_STYLES.contains(&style) {
             (
-                format!("style '{}' is not available yet in this version", style),
-                "only cutout_2d is implemented in Phase 1; rubber_hose and clay are planned for Phase 5, toon_3d for Phase 7".to_string(),
+                format!("style '{}' is planned but not available yet", style),
+                format!("available styles: {}; toon_3d arrives with the 3D renderer (Phase 7)", STYLES.join(", ")),
             )
         } else {
-            (
-                format!("unknown style '{}'", style),
-                did_you_mean(&style, ["cutout_2d", "rubber_hose", "clay", "toon_3d"]),
-            )
+            let known: Vec<&str> = STYLES.iter().chain(PLANNED_STYLES.iter()).copied().collect();
+            (format!("unknown style '{}'", style), format!("{} (available: {})", did_you_mean(style, known), STYLES.join(", ")))
         };
-        diags.push(Diagnostic::error("E2301", &label, Pos { line: 1, col: 1 }, msg).suggest(sugg));
+        diags.push(Diagnostic::error("E2301", &label, pos, msg).suggest(sugg));
+    };
+    let default_style = file.default_style.clone().unwrap_or_else(|| project.manifest.default_style.clone());
+    style_error(&default_style, Pos { line: 1, col: 1 }, &mut diags);
+    for u in &file.uses {
+        if let (true, Some(s)) = (u.kind == "character", &u.style) {
+            style_error(s, u.pos, &mut diags);
+        }
+    }
+    // Resolution order for each character: `use ... style X` > the character's own `style:` > the episode default.
+    let use_styles: BTreeMap<String, String> = file
+        .uses
+        .iter()
+        .filter(|u| u.kind == "character")
+        .filter_map(|u| u.style.clone().filter(|s| STYLES.contains(&s.as_str())).map(|s| (u.name.clone(), s)))
+        .collect();
+    let default_style = if STYLES.contains(&default_style.as_str()) { default_style } else { "cutout_2d".to_string() };
+    for (name, c) in chars.iter_mut() {
+        c.style = use_styles.get(name).cloned().or_else(|| Some(c.style.clone()).filter(|s| !s.is_empty())).unwrap_or_else(|| default_style.clone());
     }
 
     // `use` declarations.

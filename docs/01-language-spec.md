@@ -30,10 +30,13 @@ oneiro 0.1
 project "Moon Diner"
 style default: cutout_2d
 use character Marta
+use character Blob style rubber_hose
 use set diner
 ```
 
 `use` loads from `library/` of the project. Every character and set must be declared before use.
+`style default:` sets the look of the episode; `use character X style S` draws that character in another style
+(`cutout_2d`, `rubber_hose`, `clay`), so different styles can share a scene. See [08-styles.md](08-styles.md).
 
 ## 4. Scenes
 

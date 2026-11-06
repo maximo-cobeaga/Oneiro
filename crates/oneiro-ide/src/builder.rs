@@ -223,6 +223,20 @@ impl App {
                 }
             });
 
+            ui.horizontal(|ui| {
+                ui.label("Style");
+                let shown = if d.style.is_empty() { "(episode default)".to_string() } else { d.style.clone() };
+                egui::ComboBox::from_id_salt("char_style").selected_text(shown).show_ui(ui, |ui| {
+                    ui.selectable_value(&mut d.style, String::new(), "(episode default)");
+                    for s in STYLES {
+                        ui.selectable_value(&mut d.style, s.to_string(), *s);
+                    }
+                });
+            });
+            ui.label(RichText::new("cutout_2d: paper cutout - rubber_hose: 1930s noodle limbs - clay: stop-motion plasticine. A script can override it with `use character X style Y`.").weak().small());
+            if d.has_svg() {
+                ui.label(RichText::new("This character is drawn from vector parts (library/parts). The blocks below only affect its proportions.").color(Color32::from_rgb(120, 190, 240)).small());
+            }
             egui::CollapsingHeader::new(RichText::new("Head").strong()).default_open(true).show(ui, |ui| {
                 egui::ComboBox::from_label("shape").selected_text(d.head.kind.clone()).show_ui(ui, |ui| {
                     for k in HEADS {

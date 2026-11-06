@@ -55,9 +55,24 @@ pub fn draw_character(
     tint: [f64; 3],
     px: f32,
 ) {
+    draw_character_ex(pm, def, fr, v, pl, tint, px, 1.0)
+}
+
+/// Like `draw_character`, with the outline width multiplied by `outline` (0 = no outlines, for clay).
+#[allow(clippy::too_many_arguments)]
+pub fn draw_character_ex(
+    pm: &mut Pixmap,
+    def: &CharacterDef,
+    fr: &ActorFrame,
+    v: &View,
+    pl: &Placement,
+    tint: [f64; 3],
+    px: f32,
+    outline: f32,
+) {
     let s = pl.scale;
     let tf = Transform::from_translate(pl.sx, pl.sy).pre_scale(s, -s);
-    let mut p = Painter { pm, tf, ow: 2.4 * px / s, tint };
+    let mut p = Painter { pm, tf, ow: 2.4 * px / s * outline, tint };
     let ow0 = p.ow;
 
     let hh = def.height() as f32;
@@ -319,41 +334,46 @@ pub fn draw_character(
 
     // Hat
     if let Some(h) = hat {
-        let yb = hcy + r * 0.46;
-        let rr = r * 1.06;
-        let dy = yb - hcy;
-        let a0 = (dy / rr).clamp(-1.0, 1.0).asin();
-        let mut dome: Vec<P2> = Vec::new();
-        for k in 0..=16 {
-            let a = a0 + (PI - 2.0 * a0) * k as f32 / 16.0;
-            dome.push((hcx + rr * a.cos(), hcy + rr * a.sin()));
+        draw_hat(&mut p, h, hcx, hcy, r);
+    }
+}
+
+/// A hat sitting on a head of radius `r` centered at (hcx, hcy). Shared by every style.
+pub(crate) fn draw_hat(p: &mut Painter, h: &WardrobeItem, hcx: f32, hcy: f32, r: f32) {
+    let yb = hcy + r * 0.46;
+    let rr = r * 1.06;
+    let dy = yb - hcy;
+    let a0 = (dy / rr).clamp(-1.0, 1.0).asin();
+    let mut dome: Vec<P2> = Vec::new();
+    for k in 0..=16 {
+        let a = a0 + (PI - 2.0 * a0) * k as f32 / 16.0;
+        dome.push((hcx + rr * a.cos(), hcy + rr * a.sin()));
+    }
+    let half_w = (rr * rr - dy * dy).max(0.0).sqrt();
+    match h.name {
+        "chef_hat" => {
+            p.poly(&[(hcx - r * 0.9, yb - r * 0.1), (hcx + r * 0.9, yb - r * 0.1), (hcx + r * 0.85, yb + r * 0.3), (hcx - r * 0.85, yb + r * 0.3)], h.color);
+            for (cx, cy, rad) in [(-0.5, 0.75, 0.55), (0.5, 0.75, 0.55), (0.0, 1.0, 0.6)] {
+                p.circle(hcx + r * cx, yb + r * cy, r * rad, h.color);
+            }
+            p.poly(&[(hcx - r * 0.86, yb - r * 0.02), (hcx + r * 0.86, yb - r * 0.02), (hcx + r * 0.85, yb + r * 0.3), (hcx - r * 0.85, yb + r * 0.3)], h.color);
         }
-        let half_w = (rr * rr - dy * dy).max(0.0).sqrt();
-        match h.name {
-            "chef_hat" => {
-                p.poly(&[(hcx - r * 0.9, yb - r * 0.1), (hcx + r * 0.9, yb - r * 0.1), (hcx + r * 0.85, yb + r * 0.3), (hcx - r * 0.85, yb + r * 0.3)], h.color);
-                for (cx, cy, rad) in [(-0.5, 0.75, 0.55), (0.5, 0.75, 0.55), (0.0, 1.0, 0.6)] {
-                    p.circle(hcx + r * cx, yb + r * cy, r * rad, h.color);
-                }
-                p.poly(&[(hcx - r * 0.86, yb - r * 0.02), (hcx + r * 0.86, yb - r * 0.02), (hcx + r * 0.85, yb + r * 0.3), (hcx - r * 0.85, yb + r * 0.3)], h.color);
-            }
-            "green_hat" => {
-                p.poly(&dome, h.color);
-                p.ellipse(hcx - rr * 0.97, hcy - r * 0.05, r * 0.2, r * 0.5, h.accent);
-                p.ellipse(hcx + rr * 0.97, hcy - r * 0.05, r * 0.2, r * 0.5, h.accent);
-                p.poly(&[(hcx - half_w, yb), (hcx + half_w, yb), (hcx + half_w * 0.98, yb - r * 0.16), (hcx - half_w * 0.98, yb - r * 0.16)], h.accent);
-            }
-            "yellow_hat" => {
-                p.poly(&dome, h.color);
-                p.ellipse(hcx, yb - r * 0.02, half_w * 1.12, r * 0.12, h.accent);
-            }
-            _ => {
-                // beanie
-                p.poly(&dome, h.color);
-                p.poly(&[(hcx - half_w * 1.03, yb + r * 0.02), (hcx + half_w * 1.03, yb + r * 0.02), (hcx + half_w * 1.0, yb - r * 0.17), (hcx - half_w * 1.0, yb - r * 0.17)], h.color.lerp(Rgb(255, 255, 255), 0.0));
-                p.line((hcx - half_w, yb - r * 0.08), (hcx + half_w, yb - r * 0.08), r * 0.08, h.accent.lerp(h.color, 0.4));
-                p.circle(hcx, hcy + rr + r * 0.06, r * 0.2, h.accent);
-            }
+        "green_hat" => {
+            p.poly(&dome, h.color);
+            p.ellipse(hcx - rr * 0.97, hcy - r * 0.05, r * 0.2, r * 0.5, h.accent);
+            p.ellipse(hcx + rr * 0.97, hcy - r * 0.05, r * 0.2, r * 0.5, h.accent);
+            p.poly(&[(hcx - half_w, yb), (hcx + half_w, yb), (hcx + half_w * 0.98, yb - r * 0.16), (hcx - half_w * 0.98, yb - r * 0.16)], h.accent);
+        }
+        "yellow_hat" => {
+            p.poly(&dome, h.color);
+            p.ellipse(hcx, yb - r * 0.02, half_w * 1.12, r * 0.12, h.accent);
+        }
+        _ => {
+            // beanie
+            p.poly(&dome, h.color);
+            p.poly(&[(hcx - half_w * 1.03, yb + r * 0.02), (hcx + half_w * 1.03, yb + r * 0.02), (hcx + half_w * 1.0, yb - r * 0.17), (hcx - half_w * 1.0, yb - r * 0.17)], h.color.lerp(Rgb(255, 255, 255), 0.0));
+            p.line((hcx - half_w, yb - r * 0.08), (hcx + half_w, yb - r * 0.08), r * 0.08, h.accent.lerp(h.color, 0.4));
+            p.circle(hcx, hcy + rr + r * 0.06, r * 0.2, h.accent);
         }
     }
 }
@@ -361,7 +381,7 @@ pub fn draw_character(
 // ---------------------------------------------------------------------- face
 
 #[allow(clippy::too_many_arguments)]
-fn draw_face(p: &mut Painter, def: &CharacterDef, fr: &ActorFrame, v: &View, hcx: f32, hcy: f32, r: f32, ow0: f32) {
+pub(crate) fn draw_face(p: &mut Painter, def: &CharacterDef, fr: &ActorFrame, v: &View, hcx: f32, hcy: f32, r: f32, ow0: f32) {
     let hfront = v.h_front as f32;
     let hside = v.h_side as f32;
     let haf = hfront.abs().max(0.0);
@@ -431,7 +451,7 @@ fn draw_face(p: &mut Painter, def: &CharacterDef, fr: &ActorFrame, v: &View, hcx
     }
 }
 
-fn draw_mouth(p: &mut Painter, _def: &CharacterDef, fr: &ActorFrame, cx: f32, cy: f32, r: f32, wscale: f32, ow0: f32) {
+pub(crate) fn draw_mouth(p: &mut Painter, _def: &CharacterDef, fr: &ActorFrame, cx: f32, cy: f32, r: f32, wscale: f32, ow0: f32) {
     let ex = &fr.expr;
     let smile = ex.smile as f32;
     let speaking = fr.speaking;

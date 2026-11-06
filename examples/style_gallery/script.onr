@@ -1,0 +1,42 @@
+oneiro 0.1
+project "Style Gallery"
+style default: cutout_2d
+
+# One diner, three drawing styles at the same time:
+#   Marta  = cutout_2d      (library blocks, paper cutout)
+#   Blob   = rubber_hose    (1930s noodle limbs)
+#   Pip    = vector parts   (tier B: drawn in SVG, library/parts/Pip)
+use character Marta
+use character Blob style rubber_hose
+use character Pip
+use set diner
+
+scene 1 "Three styles, one diner" in diner {
+  time: day
+  place Marta at diner.stool_2 facing diner.counter
+  place Blob  at diner.counter
+  place Pip   at diner.door
+
+  music gallery_bgm volume 0.35 fade_in 1s
+  camera wide from south move dolly_in for 4s
+  Pip walks_to (-1.2, 0.2)
+  Pip waves
+  Pip (happy): "Hello! One pie, please." audio "audio/pip_01.wav"
+
+  cut to medium on Blob
+  Blob (nervous): "Coming right up!" audio "audio/blob_01.wav"
+  Blob shrugs
+
+  camera over_shoulder Marta -> Pip
+  Marta (annoyed): "You're late, robot." audio "audio/marta_01.wav"
+  Marta crosses_arms
+  Pip (surprised): "Late? I ran all the way!" audio "audio/pip_02.wav"
+  Pip shrugs
+  sfx boing
+
+  camera wide from east move dolly_out for 4s
+  Blob (happy): "Pie for everyone." audio "audio/blob_02.wav"
+  Marta shakes_head
+  music stop fade_out 2s
+  wait 1s
+}

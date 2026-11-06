@@ -204,8 +204,13 @@ impl Parser {
                         self.bump();
                         let kind = self.expect_word("a kind (character, set, style)");
                         let name = self.expect_word("a name");
+                        let mut style = None;
+                        if self.word().as_deref() == Some("style") {
+                            self.bump();
+                            style = self.expect_word("a style name (cutout_2d, rubber_hose, clay)");
+                        }
                         if let (Some(kind), Some(name)) = (kind, name) {
-                            f.uses.push(Use { kind, name, pos });
+                            f.uses.push(Use { kind, name, style, pos });
                         }
                         self.end_stmt();
                     }

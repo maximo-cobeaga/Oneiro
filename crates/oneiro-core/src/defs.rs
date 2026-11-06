@@ -4,7 +4,75 @@ use crate::catalog::*;
 use crate::math::Rgb;
 use oneiro_lang::suggest::did_you_mean;
 use oneiro_lang::{entry, Block, Diagnostic, Entry, Pos, Value};
+use crate::svg::{parse_svg, SvgDoc};
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::sync::Arc;
+
+/// One vector part of a tier-B character (an SVG file plus how to place it on the skeleton).
+#[derive(Clone, Debug)]
+pub struct SvgPart {
+    /// Path relative to the project root.
+    pub file: String,
+    /// Height of the part as a fraction of the character's total height.
+    pub height: f64,
+    /// Pivot inside the part, 0..1 from the top-left of the viewBox (the joint it turns around).
+    pub pivot: (f64, f64),
+    /// The parsed drawing; filled in by `CharacterDef::load_svg_parts`.
+    pub doc: Option<Arc<SvgDoc>>,
+}
+
+/// A character drawn with its own vector parts instead of library blocks.
+#[derive(Clone, Debug)]
+pub struct SvgRig {
+    pub parts: BTreeMap<String, SvgPart>,
+    /// Oneiro draws eyes, brows and the lipsynced mouth on the head unless the SVG already has a face.
+    pub face: bool,
+    /// Face center inside the head, 0..1 from the top-left of the head's viewBox.
+    pub face_x: f64,
+    pub face_y: f64,
+    pub face_scale: f64,
+}
+
+pub fn default_part(name: &str) -> (f64, (f64, f64)) {
+    match name {
+        "head" => (0.26, (0.5, 1.0)),
+        "body" => (0.30, (0.5, 1.0)),
+        "arm" => (0.30, (0.5, 0.05)),
+        _ => (0.38, (0.5, 0.05)),
+    }
+}
+
+/// Problems that make a part unusable (empty list = fine).
+pub fn check_part(name: &str, doc: &SvgDoc, pivot: (f64, f64)) -> Vec<String> {
+    let mut out = Vec::new();
+    let [vx, vy, vw, vh] = doc.vb;
+    if let Some((x0, y0, x1, y1)) = doc.bounds() {
+        let (mx, my) = (vw * 0.06, vh * 0.06);
+        if x0 < vx - mx || y0 < vy - my || x1 > vx + vw + mx || y1 > vy + vh + my {
+            out.push(format!(
+                "{}: the drawing spills outside its viewBox (it spans x {:.0}..{:.0}, y {:.0}..{:.0} but the viewBox is {:.0} {:.0} {:.0} {:.0}). Keep everything inside the viewBox",
+                name, x0, x1, y0, y1, vx, vy, vw, vh
+            ));
+        }
+        if (y1 - y0) < vh * 0.5 {
+            out.push(format!("{}: the drawing is too small inside its viewBox (it uses {:.0}% of the height). Make it fill the viewBox: the renderer scales the whole viewBox to the part height", name, (y1 - y0) / vh * 100.0));
+        }
+        if (x1 - x0) < vw * 0.12 {
+            out.push(format!("{}: the drawing is extremely narrow inside its viewBox; crop the viewBox to the drawing", name));
+        }
+    }
+    let aspect = vw / vh;
+    match name {
+        "arm" | "leg" if aspect > 1.0 => out.push(format!("{}: limbs need a tall viewBox (height greater than width), for example viewBox=\"0 0 24 100\"", name)),
+        "head" | "body" if !(0.3..=3.0).contains(&aspect) => out.push(format!("{}: unusual proportions (width/height = {:.2}); use a viewBox between 1:3 and 3:1", name, aspect)),
+        _ => {}
+    }
+    if !(0.0..=1.0).contains(&pivot.0) || !(0.0..=1.0).contains(&pivot.1) {
+        out.push(format!("{}: the pivot must be inside the part (both numbers between 0 and 1)", name));
+    }
+    out
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct PartDef {
@@ -43,6 +111,10 @@ pub struct CharacterDef {
     pub traits: Vec<String>,
     pub notes: String,
     pub styles: BTreeMap<String, String>,
+    /// The style this character is drawn in. Empty = the episode's default style.
+    pub style: String,
+    /// Vector parts (tier B). `None` for characters built from library blocks (tier A).
+    pub svg: Option<SvgRig>,
 }
 
 impl CharacterDef {
@@ -75,6 +147,8 @@ impl CharacterDef {
             traits: Vec::new(),
             notes: String::new(),
             styles: BTreeMap::new(),
+            style: String::new(),
+            svg: None,
         };
         if b.name.is_none() {
             diags.push(
@@ -94,6 +168,22 @@ impl CharacterDef {
                             );
                         }
                         c.rig = kind.to_string();
+                    }
+                }
+                "style" => {
+                    if let Some(v) = e.value().and_then(|v| v.as_str()) {
+                        if STYLES.contains(&v) {
+                            c.style = v.to_string();
+                        } else {
+                            let known: Vec<&str> = STYLES.iter().chain(PLANNED_STYLES.iter()).copied().collect();
+                            let msg = if PLANNED_STYLES.contains(&v) { format!("style '{}' is planned but not available yet", v) } else { format!("unknown style '{}'", v) };
+                            diags.push(Diagnostic::error("E2301", file, e.pos, msg).suggest(format!("available: {}. {}", STYLES.join(", "), did_you_mean(v, known))));
+                        }
+                    }
+                }
+                "parts" => {
+                    if let Some(inner) = e.block() {
+                        c.svg = Some(parse_parts(inner, file, &c.name, diags));
                     }
                 }
                 "build" => {
@@ -188,6 +278,105 @@ impl CharacterDef {
             }
         }
         c
+    }
+}
+
+fn tuple2(v: Option<&Value>) -> Option<(f64, f64)> {
+    match v? {
+        Value::Tuple(t) | Value::List(t) if t.len() == 2 => Some((t[0].as_num()?, t[1].as_num()?)),
+        _ => None,
+    }
+}
+
+fn parse_parts(inner: &[Entry], file: &str, owner: &str, diags: &mut Vec<Diagnostic>) -> SvgRig {
+    let mut rig = SvgRig { parts: BTreeMap::new(), face: true, face_x: 0.5, face_y: 0.5, face_scale: 1.0 };
+    for pe in inner {
+        let Some(b) = pe.block() else {
+            diags.push(Diagnostic::error("E1110", file, pe.pos, format!("'{}' in parts must be a block, e.g. head {{ file: \"parts/head.svg\" }}", pe.key)));
+            continue;
+        };
+        if pe.key == "face" {
+            if let Some(m) = entry(b, "mode").and_then(|x| x.value()).and_then(|v| v.as_str()) {
+                match m {
+                    "none" => rig.face = false,
+                    "auto" => rig.face = true,
+                    other => diags.push(Diagnostic::error("E1110", file, pe.pos, format!("face mode '{}' is not valid", other)).suggest("use mode: auto (Oneiro draws the face) or mode: none (the SVG has its own face)")),
+                }
+            }
+            if let Some(v) = entry(b, "x").and_then(|x| x.value()).and_then(|v| v.as_num()) {
+                rig.face_x = v.clamp(0.0, 1.0);
+            }
+            if let Some(v) = entry(b, "y").and_then(|x| x.value()).and_then(|v| v.as_num()) {
+                rig.face_y = v.clamp(0.0, 1.0);
+            }
+            if let Some(v) = entry(b, "scale").and_then(|x| x.value()).and_then(|v| v.as_num()) {
+                rig.face_scale = v.clamp(0.3, 2.0);
+            }
+            continue;
+        }
+        if !SVG_PARTS.contains(&pe.key.as_str()) {
+            diags.push(Diagnostic::error("E1110", file, pe.pos, format!("unknown part '{}'", pe.key)).suggest(format!("valid parts: {}, face", SVG_PARTS.join(", "))));
+            continue;
+        }
+        let (h0, p0) = default_part(&pe.key);
+        // Without `file` the part lives at library/parts/<Character>/<part>.svg.
+        let default_file = format!("library/parts/{}/{}.svg", owner, pe.key);
+        let f = entry(b, "file").and_then(|x| x.value()).and_then(|v| v.as_str()).unwrap_or(&default_file);
+        let height = entry(b, "height").and_then(|x| x.value()).and_then(|v| v.as_num()).unwrap_or(h0);
+        if !(0.05..=1.0).contains(&height) {
+            diags.push(Diagnostic::error("E1112", file, pe.pos, format!("part '{}' height {} is outside 0.05..1.0 (a fraction of the character's height)", pe.key, height)));
+        }
+        let pivot = tuple2(entry(b, "pivot").and_then(|x| x.value())).unwrap_or(p0);
+        rig.parts.insert(pe.key.clone(), SvgPart { file: f.to_string(), height: height.clamp(0.05, 1.0), pivot, doc: None });
+    }
+    for need in SVG_PARTS {
+        if !rig.parts.contains_key(*need) {
+            diags.push(Diagnostic::error("E1113", file, Pos { line: 1, col: 1 }, format!("a character with vector parts needs all of: {} (missing '{}')", SVG_PARTS.join(", "), need)));
+        }
+    }
+    rig
+}
+
+impl CharacterDef {
+    /// True when the character has all its vector parts loaded and valid.
+    pub fn has_svg(&self) -> bool {
+        self.svg.as_ref().map_or(false, |s| s.parts.len() == SVG_PARTS.len() && s.parts.values().all(|p| p.doc.is_some()))
+    }
+
+    /// Reads and validates the SVG files of a tier-B character (paths relative to `root`).
+    pub fn load_svg_parts(&mut self, root: &Path, label: &str, diags: &mut Vec<Diagnostic>) {
+        let Some(rig) = &mut self.svg else { return };
+        for (name, part) in rig.parts.iter_mut() {
+            let at = Pos { line: 1, col: 1 };
+            // Keep parts inside the project: no absolute paths or `..`.
+            if Path::new(&part.file).is_absolute() || part.file.split(['/', '\\']).any(|s| s == "..") {
+                diags.push(Diagnostic::error("E1115", label, at, format!("part '{}': the file must be inside the project (no absolute paths or '..')", name)));
+                continue;
+            }
+            let src = match std::fs::read_to_string(root.join(&part.file)) {
+                Ok(s) => s,
+                Err(e) => {
+                    diags.push(Diagnostic::error("E1115", label, at, format!("part '{}': cannot read {}: {}", name, part.file, e)));
+                    continue;
+                }
+            };
+            match parse_svg(&src) {
+                Err(errs) => {
+                    for e in errs {
+                        diags.push(Diagnostic::error("E1116", label, at, format!("part '{}' ({}): {}", name, part.file, e)));
+                    }
+                }
+                Ok(doc) => {
+                    let problems = check_part(name, &doc, part.pivot);
+                    for p in &problems {
+                        diags.push(Diagnostic::error("E1117", label, at, format!("{} ({})", p, part.file)));
+                    }
+                    if problems.is_empty() {
+                        part.doc = Some(Arc::new(doc));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -541,12 +730,36 @@ impl CharacterDef {
         let mut s = String::new();
         s.push_str(&format!("character {} {{\n", self.name));
         s.push_str(&format!("  rig: library.rigs.{}\n", self.rig));
+        if !self.style.is_empty() {
+            s.push_str(&format!("  style: {}\n", self.style));
+        }
         s.push_str("  build {\n");
         s.push_str(&format!("    head:  library.heads.{}{}\n", self.head.kind, self.head.params_source()));
         s.push_str(&format!("    eyes:  library.eyes.{}{}\n", self.eyes.kind, self.eyes.params_source()));
         s.push_str(&format!("    mouth: library.mouths.{}{}\n", self.mouth.kind, self.mouth.params_source()));
         s.push_str(&format!("    body:  library.bodies.{}{}\n", self.body.kind, self.body.params_source()));
         s.push_str("  }\n");
+        if let Some(rig) = &self.svg {
+            s.push_str("  parts {\n");
+            for name in SVG_PARTS {
+                if let Some(p) = rig.parts.get(*name) {
+                    s.push_str(&format!(
+                        "    {} {{ file: \"{}\", height: {}, pivot: ({}, {}) }}\n",
+                        name,
+                        p.file.replace('"', ""),
+                        trim_num(p.height),
+                        trim_num(p.pivot.0),
+                        trim_num(p.pivot.1)
+                    ));
+                }
+            }
+            if rig.face {
+                s.push_str(&format!("    face {{ mode: auto, x: {}, y: {}, scale: {} }}\n", trim_num(rig.face_x), trim_num(rig.face_y), trim_num(rig.face_scale)));
+            } else {
+                s.push_str("    face { mode: none }\n");
+            }
+            s.push_str("  }\n");
+        }
         if !self.wardrobe.is_empty() {
             s.push_str(&format!("  wardrobe {{\n    default: [{}]\n  }}\n", self.wardrobe.join(", ")));
         }

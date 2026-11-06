@@ -8,6 +8,7 @@ All files use the same Oneiro syntax; the extension tells tooling what to expect
 | `.onchar` | Character |
 | `.onset` | Set (environment) |
 | `.onlock` | Resolved layout (generated; edit values and add `pinned: true` to keep them) |
+| `.svg` (in `library/parts/<Name>/`) | Vector parts of a tier-B character (safe SVG subset, see 08-styles.md) |
 | `.onstyle`, `.onclip` | Planned (custom styles, reusable animation clips) |
 
 ## 1. Project layout
@@ -46,6 +47,9 @@ character Marta {
   styles { cutout_2d: auto }
 }
 ```
+
+Optional entries: `style: rubber_hose` (the character's own look: `cutout_2d`, `rubber_hose` or `clay`) and a `parts { ... }`
+block that replaces the library blocks with four SVG files (head, body, arm, leg); see [08-styles.md](08-styles.md).
 
 A character is **Rig + Skin (per style) + Face + Wardrobe + Voice + Sheet**. Parts and wardrobe come from the
 global library (see `oneiro vocab`); this is the "character as blocks" builder (tier A). The `sheet` is for humans

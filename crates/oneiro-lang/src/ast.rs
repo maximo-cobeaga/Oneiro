@@ -123,6 +123,8 @@ pub struct File {
 pub struct Use {
     pub kind: String,
     pub name: String,
+    /// `use character Marta style rubber_hose`: the style of this character in this episode.
+    pub style: Option<String>,
     pub pos: Pos,
 }
 

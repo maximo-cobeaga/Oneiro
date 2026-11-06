@@ -123,7 +123,8 @@ impl Project {
             for b in &file.blocks {
                 match b.kind.as_str() {
                     "character" => {
-                        let c = CharacterDef::from_block(b, &label, diags);
+                        let mut c = CharacterDef::from_block(b, &label, diags);
+                        c.load_svg_parts(&self.root, &label, diags);
                         self.characters.insert(c.name.clone(), c);
                     }
                     "set" => {

@@ -18,7 +18,8 @@ pub enum AiMode {
 pub enum Proposal {
     None,
     Script { text: String, valid: bool, problems: Vec<String>, diff: Vec<(DiffTag, String)>, state: ProposalState },
-    Character { source: String, name: String, state: ProposalState },
+    /// `svgs` is non-empty for characters drawn as vector parts (tier B): (path in the project, SVG text).
+    Character { source: String, name: String, svgs: Vec<(String, String)>, state: ProposalState },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,6 +40,7 @@ pub enum AiMsg {
     Progress(String),
     Scene(Result<SceneResult, String>, String),
     Character(Result<CharacterResult, String>, String),
+    Parts(Result<oneiro_ai::PartsResult, String>, String),
     Test(Result<String, String>),
 }
 
@@ -58,6 +60,8 @@ pub struct AiState {
     pub job: Option<AiJob>,
     pub undo: Vec<String>,
     pub show_settings: bool,
+    /// Character mode: draw the character as vector (SVG) parts instead of picking library blocks.
+    pub parts: bool,
 }
 
 impl Default for AiState {
@@ -72,6 +76,7 @@ impl Default for AiState {
             job: None,
             undo: vec![],
             show_settings: false,
+            parts: false,
         }
     }
 }
@@ -151,6 +156,7 @@ impl App {
         let key = self.ai.session_key.clone();
         let history = self.ai.history.clone();
         let mode = self.ai.mode;
+        let parts = self.ai.parts;
         self.ai.chat.push(ChatItem::User(request.clone()));
         let (tx, rx) = channel();
         self.ai.job = Some(AiJob { rx, started: Instant::now(), status: "starting...".into() });
@@ -161,6 +167,7 @@ impl App {
                 Err(e) => {
                     let _ = tx.send(match mode {
                         AiMode::Scene => AiMsg::Scene(Err(e), request),
+                        AiMode::Character if parts => AiMsg::Parts(Err(e), request),
                         AiMode::Character => AiMsg::Character(Err(e), request),
                     });
                     c2.request_repaint();
@@ -179,6 +186,7 @@ impl App {
                     let pctx = ProjectCtx { project: &project, lock: &lock, script_label: label };
                     AiMsg::Scene(oneiro_ai::direct_scene(provider.as_ref(), &pctx, &script, &history, &request, &opts, &mut progress), request)
                 }
+                AiMode::Character if parts => AiMsg::Parts(oneiro_ai::direct_character_parts(provider.as_ref(), &project, &request, &history, &opts, &mut progress), request),
                 AiMode::Character => AiMsg::Character(oneiro_ai::direct_character(provider.as_ref(), &project, &request, &history, &opts, &mut progress), request),
             };
             let _ = tx.send(msg);
@@ -231,7 +239,7 @@ impl App {
             AiMsg::Progress(_) => {}
             AiMsg::Test(Ok(t)) => self.ai.chat.push(ChatItem::Info(format!("Connection OK. {}", t))),
             AiMsg::Test(Err(e)) => self.ai.chat.push(ChatItem::Error(e)),
-            AiMsg::Scene(Err(e), _) | AiMsg::Character(Err(e), _) => self.ai.chat.push(ChatItem::Error(e)),
+            AiMsg::Scene(Err(e), _) | AiMsg::Character(Err(e), _) | AiMsg::Parts(Err(e), _) => self.ai.chat.push(ChatItem::Error(e)),
             AiMsg::Scene(Ok(r), request) => {
                 let footer = format!("{} model call(s), {:.0}s{}", r.rounds, elapsed, if r.usage.0 + r.usage.1 > 0 { format!(", {} in / {} out tokens", r.usage.0, r.usage.1) } else { String::new() });
                 let problems: Vec<String> = r.diagnostics.iter().filter(|d| d.is_error()).map(|d| d.render()).collect();
@@ -246,10 +254,26 @@ impl App {
                 self.ai.history.push(Turn { user: request, assistant: r.reply.clone() });
                 self.ai.chat.push(ChatItem::Ai { text: r.reply, notes: r.notes, proposal, footer });
             }
+            AiMsg::Parts(Ok(r), request) => {
+                let footer = format!("{} model call(s), {:.0}s", r.rounds, elapsed);
+                let proposal = match (&r.def, &r.source) {
+                    (Some(def), Some(src)) if r.valid => Proposal::Character { source: src.clone(), name: def.name.clone(), svgs: r.svgs.clone(), state: ProposalState::Pending },
+                    _ => Proposal::None,
+                };
+                let mut text = r.reply.clone();
+                if !r.valid {
+                    text.push_str("\n\nThe drawing still has problems:\n");
+                    for d in r.diagnostics.iter().filter(|d| d.is_error()) {
+                        text.push_str(&format!("{}\n", d.render()));
+                    }
+                }
+                self.ai.history.push(Turn { user: request, assistant: r.reply });
+                self.ai.chat.push(ChatItem::Ai { text, notes: vec![], proposal, footer });
+            }
             AiMsg::Character(Ok(r), request) => {
                 let footer = format!("{} model call(s), {:.0}s", r.rounds, elapsed);
                 let proposal = match (&r.def, &r.source) {
-                    (Some(def), Some(src)) if r.valid => Proposal::Character { source: src.clone(), name: def.name.clone(), state: ProposalState::Pending },
+                    (Some(def), Some(src)) if r.valid => Proposal::Character { source: src.clone(), name: def.name.clone(), svgs: vec![], state: ProposalState::Pending },
                     _ => Proposal::None,
                 };
                 let mut text = r.reply.clone();
@@ -394,6 +418,10 @@ impl App {
             ui.selectable_value(&mut self.ai.mode, AiMode::Scene, "Write / edit scenes");
             ui.selectable_value(&mut self.ai.mode, AiMode::Character, "Design a character");
         });
+        if self.ai.mode == AiMode::Character {
+            ui.checkbox(&mut self.ai.parts, "Draw it as vector parts (SVG) instead of library blocks")
+                .on_hover_text("The AI draws the head, body, arm and leg as SVG; the engine checks them and Oneiro animates and lip-syncs the result. Needs a capable model.");
+        }
         ui.separator();
 
         // ------------------------------------------------------------ input (bottom) and transcript
@@ -440,7 +468,7 @@ impl App {
 
         let mut apply_script: Option<(usize, String)> = None;
         let mut reject: Option<usize> = None;
-        let mut apply_char: Option<(usize, String, String)> = None;
+        let mut apply_char: Option<(usize, String, String, Vec<(String, String)>)> = None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
             for (i, item) in self.ai.chat.iter().enumerate() {
                 match item {
@@ -512,14 +540,15 @@ impl App {
                                         }
                                     }
                                 }
-                                Proposal::Character { source, name, state } => {
-                                    ui.label(RichText::new(format!("character {}", name)).strong());
+                                Proposal::Character { source, name, svgs, state } => {
+                                    ui.label(RichText::new(format!("character {}{}", name, if svgs.is_empty() { "" } else { " (vector parts)" })).strong());
                                     ui.add(egui::Label::new(RichText::new(source).monospace().small()).wrap());
                                     match state {
                                         ProposalState::Pending => {
                                             ui.horizontal(|ui| {
-                                                if ui.button("Preview in the builder").clicked() {
-                                                    apply_char = Some((i, name.clone(), source.clone()));
+                                                let label = if svgs.is_empty() { "Preview in the builder" } else { "Save to the library and open" };
+                                                if ui.button(label).clicked() {
+                                                    apply_char = Some((i, name.clone(), source.clone(), svgs.clone()));
                                                 }
                                                 if ui.button("Reject").clicked() {
                                                     reject = Some(i);
@@ -548,13 +577,34 @@ impl App {
                 *state = ProposalState::Applied;
             }
         }
-        if let Some((i, name, source)) = apply_char {
-            let (file, _) = oneiro_lang::parse(&source, "ai");
-            if let Some(b) = file.blocks.first() {
-                let mut d = vec![];
-                let def = oneiro_core::CharacterDef::from_block(b, "ai", &mut d);
-                self.builder.load_draft(def, true);
-                self.right_tab = RightTab::Character;
+        if let Some((i, name, source, svgs)) = apply_char {
+            if !svgs.is_empty() {
+                // Vector character: the SVG files must exist for the character to load, so it is saved right away.
+                let root = self.ws.as_ref().map(|w| w.root.clone());
+                if let Some(root) = root {
+                    match oneiro_ai::parts::save_files(&root, &name, &source, &svgs) {
+                        Ok(path) => {
+                            if let Some(ws) = &mut self.ws {
+                                ws.reload_project();
+                                ws.recompile();
+                            }
+                            self.thumbs.clear();
+                            self.vp.invalidate();
+                            self.builder.select(self.ws.as_ref(), &name);
+                            self.right_tab = RightTab::Character;
+                            self.status = format!("Saved {} and its {} SVG parts", path.display(), svgs.len());
+                        }
+                        Err(e) => self.status = format!("Could not save the character: {}", e),
+                    }
+                }
+            } else {
+                let (file, _) = oneiro_lang::parse(&source, "ai");
+                if let Some(b) = file.blocks.first() {
+                    let mut d = vec![];
+                    let def = oneiro_core::CharacterDef::from_block(b, "ai", &mut d);
+                    self.builder.load_draft(def, true);
+                    self.right_tab = RightTab::Character;
+                }
             }
             if let Some(ChatItem::Ai { proposal: Proposal::Character { state, .. }, .. }) = self.ai.chat.get_mut(i) {
                 *state = ProposalState::Applied;

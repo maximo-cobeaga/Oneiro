@@ -8,6 +8,15 @@ pub const EYES: &[&str] = &["dots", "ovals", "wide"];
 pub const MOUTHS: &[&str] = &["visemes_basic"];
 pub const BODIES: &[&str] = &["kid", "adult", "round"];
 pub const RIGS: &[&str] = &["biped_cutout"];
+
+/// Visual styles a character can be drawn in. `cutout_2d` is the South Park-like paper cutout,
+/// `rubber_hose` the 1930s noodle-limbed look, `clay` a stop-motion plasticine look applied on top
+/// of the character's own drawing. Styles are chosen per character, so one scene can mix them.
+pub const STYLES: &[&str] = &["cutout_2d", "rubber_hose", "clay"];
+pub const PLANNED_STYLES: &[&str] = &["toon_3d"];
+/// Parts of a vector (SVG) character, in the order they must be provided.
+pub const SVG_PARTS: &[&str] = &["head", "body", "arm", "leg"];
+
 pub const PROP_KINDS: &[&str] = &["counter", "stool", "table", "wall_clock", "window", "door", "pie_case"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

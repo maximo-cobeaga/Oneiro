@@ -1,0 +1,36 @@
+oneiro 0.1
+project "Style Gallery (clay)"
+style default: clay
+
+# The same cast, all of them in stop-motion clay (the style is applied on top of each character's own drawing).
+use character Marta
+use character Blob
+use character Pip
+use set diner
+
+scene 1 "Clay diner" in diner {
+  time: day
+  place Marta at diner.stool_2 facing diner.counter
+  place Blob  at diner.counter
+  place Pip   at diner.door
+
+  music gallery_bgm volume 0.35 fade_in 1s
+  camera wide from south move dolly_in for 4s
+  Pip walks_to (-1.2, 0.2)
+  Pip waves
+  Pip (happy): "Hello! One pie, please." audio "audio/pip_03.wav"
+
+  cut to medium on Blob
+  Blob (nervous): "Coming right up!" audio "audio/blob_03.wav"
+  Blob shrugs
+
+  camera over_shoulder Marta -> Pip
+  Marta (annoyed): "You're late, robot." audio "audio/marta_02.wav"
+  Marta crosses_arms
+  Pip (surprised): "Late? I ran all the way!" audio "audio/pip_04.wav"
+
+  camera wide from east move dolly_out for 4s
+  Marta shakes_head
+  music stop fade_out 2s
+  wait 1s
+}

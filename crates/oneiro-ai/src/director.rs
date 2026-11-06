@@ -110,7 +110,7 @@ fn errors_of(d: &[Diagnostic]) -> Vec<&Diagnostic> {
     d.iter().filter(|x| x.is_error()).collect()
 }
 
-fn feedback_message(what: &str, diags: &[Diagnostic]) -> String {
+pub(crate) fn feedback_message(what: &str, diags: &[Diagnostic]) -> String {
     let errs = errors_of(diags);
     let human: Vec<String> = errs.iter().map(|d| d.render()).collect();
     let owned: Vec<Diagnostic> = errs.iter().map(|d| (*d).clone()).collect();
@@ -124,7 +124,7 @@ fn feedback_message(what: &str, diags: &[Diagnostic]) -> String {
     )
 }
 
-fn add_usage(total: &mut (u64, u64), r: &ChatResponse) {
+pub(crate) fn add_usage(total: &mut (u64, u64), r: &ChatResponse) {
     if let Some((i, o)) = r.usage {
         total.0 += i;
         total.1 += o;

@@ -75,7 +75,7 @@ fn bad_references_produce_specific_codes() {
     assert!(has(&with_replacement("place Blob  at diner.door", ""), "E1041"));
     assert!(has(&with_replacement("(annoyed): \"Where's", "(anoyed): \"Where's"), "E1046"));
     assert!(has(&with_replacement("cut to close on Blob", "cut to closeup on Blob"), "E1045"));
-    assert!(has(&with_replacement("style default: cutout_2d", "style default: rubber_hose"), "E2301"));
+    assert!(has(&with_replacement("style default: cutout_2d", "style default: toon_3d"), "E2301"));
     assert!(has(&with_replacement("audio/marta_01.wav", "audio/does_not_exist.wav"), "E2401"));
     assert!(has(&with_replacement("use character Blob", "use character Blobb"), "E1051"));
     assert!(has(&with_replacement("use set diner", "use set dinner"), "E1050"));

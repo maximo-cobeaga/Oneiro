@@ -7,7 +7,7 @@
 | 2 | **IDE v1** | **Done** — see docs/05-ide.md and results below |
 | 3 | **AI integration** | **Done** - see docs/06-ai.md |
 | 4 | Audio studio | **Done** - see docs/07-audio.md and results below |
-| 5 | Style expansion | rubber_hose, clay post, per-character styles, hybrid episodes; character tier B (AI-authored SVG) |
+| 5 | Style expansion | **Done** - see docs/08-styles.md and results below |
 | 6 | Hybrid cutter (tier C) | Assisted segmentation + validator in IDE |
 | 7 | toon3d | wgpu 3D toon renderer; then physics and cloth for 3D only |
 
@@ -101,3 +101,29 @@ samples, but the default Windows microphone on the development machine is a virt
 Known limitations: the soundtrack is mono (no panning for `sfx at ANCHOR`); generated music is simple and loop-based;
 the demo voice is still babble; lipsync is still the spectral heuristic; ducking is a fixed envelope, not side-chained
 per speaker; the script is not saved automatically after voices are generated (Ctrl+S).
+
+## Phase 5 results (styles and vector characters)
+
+| Goal | Result |
+|---|---|
+| Per-character styles | `style default:`, `use character X style S`, `style:` in the `.onchar`; resolution order and `E2301` suggestions tested |
+| `rubber_hose` | Noodle limbs, pie eyes, gloves, bounce/squash, 12 fps boil, on a skeleton shared with vector characters |
+| `clay` | Plasticine shading over any character drawing, texture attached to the body, stop-motion on twos with jitter |
+| Hybrid episodes | One scene can mix cutout, rubber hose, clay and vector characters; deterministic, parallel == serial |
+| Tier B (AI-authored SVG) | Safe SVG subset parser (no scripts, images, `use`, gradients, external references), rig with pivots, procedural lip-synced face, engine validation with 8 error codes; `oneiro ai --character --svg`, IDE option, MCP `write_character_parts` |
+| IDE | Style selector in the character builder, vector-character note, AI tab option with "Save to the library and open" |
+
+Example: `examples/style_gallery` (hybrid and clay episodes, a hand-drawn vector robot `Pip`, and `Wisp`, a ghost drawn by Claude).
+
+Tests: 141 automated tests across the workspace, including: SVG parser/validator (rejections, arcs, transforms), style resolution
+and errors, style rendering (distinct looks, 12 fps holds, gestures x styles x characters), shading maths, hybrid
+determinism, the AI loop with a mock provider (invalid drawings corrected on retry) and the MCP tool.
+Verified for real: stills and the IDE of every style, the IDE with a vector character, the `claude-cli` bridge drawing a new
+character (one round, about 10 s, rendered and animated), render speed at 1080p on 16 threads (hybrid 7.2x real time, clay 4.3x).
+
+**Not verified:** AI drawing quality across models and prompts (one real run with Claude Code; the Anthropic API and OpenAI-compatible
+providers use the same code path but were not run for this), vector characters in sets other than the diner, and `clay` on a machine without
+many cores (single-thread 1080p clay is well below real time; the preview resolution is fine).
+
+Known limitations: the diner is drawn identically in every style; vector characters have rigid arms and rotate (not fold) their legs when
+sitting; `clay` in the IDE viewport is shaded but not "on twos" while dragging; no user-defined styles (`.onstyle`) yet.

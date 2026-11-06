@@ -2,13 +2,17 @@
 //! time, so frames can be rendered in parallel and are bit-for-bit reproducible.
 
 pub mod character;
+pub mod clay;
 pub mod draw;
 pub mod encode;
 pub mod export;
+pub mod hose;
+pub mod pose;
 pub mod preview;
+pub mod puppet;
 pub mod set;
 
-use character::{draw_character, Placement, View};
+use character::{draw_character_ex, Placement, View};
 use draw::{Cam, Painter};
 use oneiro_core::math::*;
 use oneiro_core::timeline::ActorFrame;
@@ -51,7 +55,20 @@ impl<'a> Renderer<'a> {
             return pm;
         };
         let sc = &self.ep.scenes[si];
-        self.render_scene(sc, sc.camera_at(lt), sc.frames_at(lt))
+        let mut frames = sc.frames_at(lt);
+        // Clay characters are animated "on twos" like stop-motion: they hold each pose for 1/12 s.
+        if sc.actors.iter().any(|a| a.def.style == "clay") {
+            let q = (lt * 12.0).floor() / 12.0;
+            let held = sc.frames_at(q);
+            for fr in frames.iter_mut() {
+                if sc.actors[fr.idx].def.style == "clay" {
+                    if let Some(h) = held.iter().find(|f| f.idx == fr.idx) {
+                        *fr = h.clone();
+                    }
+                }
+            }
+        }
+        self.render_scene(sc, sc.camera_at(lt), frames)
     }
 
     /// Renders one scene with an explicit camera and actor frames (used by the IDE for free
@@ -167,8 +184,47 @@ impl<'a> Renderer<'a> {
 
         let view = View { front, side, h_front, h_side, eye_dx, eye_dy, target_side, target_up };
         let pl = Placement { sx, sy, scale };
-        draw_character(&mut *p.pm, def, fr, &view, &pl, tint, px);
+        draw_styled(&mut *p.pm, def, fr, &view, &pl, tint, px);
     }
+}
+
+/// Draws one character in its own style. `cutout_2d` and `rubber_hose` draw straight onto the frame; `clay`
+/// draws the character (whichever base drawing it has) into a layer and shades it like plasticine.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorFrame, view: &View, pl: &Placement, tint: [f64; 3], px: f32) {
+    let base = |pm: &mut Pixmap, pl: &Placement, outline: f32| {
+        if def.has_svg() {
+            puppet::draw_puppet(pm, def, fr, view, pl, tint, px, outline);
+        } else if def.style == "rubber_hose" {
+            hose::draw_hose(pm, def, fr, view, pl, tint, px, outline);
+        } else {
+            draw_character_ex(pm, def, fr, view, pl, tint, px, outline);
+        }
+    };
+    if def.style != "clay" {
+        base(pm, pl, 1.0);
+        return;
+    }
+    let hh = def.height() as f32;
+    let size_px = hh * pl.scale;
+    let seed = hash_str(&def.name);
+    let frame12 = (fr.t * 12.0).floor() as i64;
+    let (jx, jy) = clay::jitter(frame12, seed, size_px);
+    // A layer around the character (generous: raised arms, a hat, a wave).
+    let seat = (fr.kin.sit * fr.kin.seat_h) as f32 * pl.scale; // sitting on a stool lifts the whole body
+    let (hw, up, down) = (0.8 * size_px, 1.35 * size_px + seat, 0.12 * size_px);
+    let x0 = ((pl.sx - hw).floor() as i64).max(0);
+    let y0 = ((pl.sy - up).floor() as i64).max(0);
+    let x1 = ((pl.sx + hw).ceil() as i64).min(pm.width() as i64);
+    let y1 = ((pl.sy + down).ceil() as i64).min(pm.height() as i64);
+    if x1 - x0 < 4 || y1 - y0 < 4 || size_px < 8.0 {
+        return;
+    }
+    let Some(mut layer) = Pixmap::new((x1 - x0) as u32, (y1 - y0) as u32) else { return };
+    let local = Placement { sx: pl.sx - x0 as f32 + jx, sy: pl.sy - y0 as f32 + jy, scale: pl.scale };
+    base(&mut layer, &local, 0.0);
+    clay::shade(&mut layer, size_px, (local.sx, local.sy), seed);
+    pm.draw_pixmap(x0 as i32, y0 as i32, layer.as_ref(), &tiny_skia::PixmapPaint::default(), Transform::identity(), None);
 }
 
 /// FNV-style hash of a frame, used to verify deterministic rendering.
