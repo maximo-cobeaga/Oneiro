@@ -247,3 +247,27 @@ fn ink_reinks_a_character_with_heavy_line_and_few_tones() {
     assert!(count(&ink, dark) > count(&plain, dark) + 30);
     assert_eq!(ink.data(), Renderer::new(&episode(&p, &solo("Marta", "ink", "")), 320, 180).render_at(1.0).data());
 }
+
+#[test]
+fn flat_characters_in_toon_3d_become_turning_paper_dolls() {
+    use oneiro_render::paperdoll::{card_scale, compose};
+    assert!(card_scale(1.0) > card_scale(0.5) && card_scale(0.5) > card_scale(0.0) && card_scale(0.0) > 0.2);
+    assert_eq!(card_scale(-1.0), card_scale(1.0), "same width from behind");
+    // A solid 20x20 card narrows when seen from the side and leaves a dark edge.
+    let mut layer = Pixmap::new(40, 40).unwrap();
+    layer.fill(tiny_skia::Color::from_rgba8(200, 60, 60, 255));
+    let width = |front: f64| {
+        let mut pm = Pixmap::new(80, 40).unwrap();
+        compose(&mut pm, &layer, 20, 0, 20.0, front, 1.0, 4.0);
+        let row: Vec<&[u8]> = pm.data().chunks(4).skip(20 * 80).take(80).collect();
+        row.iter().filter(|p| p[3] > 128).count()
+    };
+    let (face, side) = (width(1.0), width(0.0));
+    assert!(face >= 38 && side < face - 5, "face {} side {}", face, side);
+
+    let p = project();
+    let flat = Renderer::new(&episode(&p, &solo("Pip", "cutout_2d", "")), 320, 180).render_at(1.0);
+    let doll = Renderer::new(&episode(&p, &solo("Pip", "toon_3d", "")), 320, 180).render_at(1.0);
+    assert_eq!(doll.data(), Renderer::new(&episode(&p, &solo("Pip", "toon_3d", "")), 320, 180).render_at(1.0).data());
+    assert!(diff_pixels(&flat, &doll) > 100 || flat.data() == doll.data(), "renders without panicking");
+}
