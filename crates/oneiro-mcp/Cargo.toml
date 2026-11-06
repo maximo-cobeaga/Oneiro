@@ -1,0 +1,13 @@
+[package]
+name = "oneiro-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "oneiro-mcp"
+path = "src/main.rs"
+
+[dependencies]
+oneiro-ai = { path = "../oneiro-ai" }
+serde_json = "1"

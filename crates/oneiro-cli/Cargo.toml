@@ -1,0 +1,17 @@
+[package]
+name = "oneiro-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "oneiro"
+path = "src/main.rs"
+
+[dependencies]
+oneiro-lang = { path = "../oneiro-lang" }
+oneiro-core = { path = "../oneiro-core" }
+oneiro-audio = { path = "../oneiro-audio" }
+oneiro-render = { path = "../oneiro-render" }
+oneiro-ai = { path = "../oneiro-ai" }
+oneiro-voice = { path = "../oneiro-voice" }

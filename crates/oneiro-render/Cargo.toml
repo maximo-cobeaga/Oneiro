@@ -1,0 +1,12 @@
+[package]
+name = "oneiro-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+oneiro-core = { path = "../oneiro-core" }
+oneiro-audio = { path = "../oneiro-audio" }
+oneiro-lang = { path = "../oneiro-lang" }
+tiny-skia = "0.11"
+rayon = "1"

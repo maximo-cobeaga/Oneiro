@@ -1,0 +1,47 @@
+oneiro 0.1
+project "Moon Diner"
+style default: cutout_2d
+
+use character Marta
+use character Blob
+use set diner
+
+# A 30 second short: a late order at a night diner.
+scene 1 "Late order" in diner {
+  time: night
+  place Marta at diner.stool_2 facing diner.counter
+  place Blob  at diner.door
+
+  camera establishing wide from south move dolly_in for 4s
+  sfx door_bell at diner.door
+  wait 2.5s
+  Blob walks_to diner.counter
+
+  cut to medium on Marta
+  Marta (annoyed): "Where's my pie?" audio "audio/marta_01.wav"
+
+  camera over_shoulder Marta -> Blob
+  Blob looks_at diner.clock and shrugs
+  Blob (nervous): "It's... coming." audio "audio/blob_01.wav"
+  wait 0.5s
+
+  camera over_shoulder Blob -> Marta
+  Marta crosses_arms
+  Marta (angry): "It's been an hour." audio "audio/marta_02.wav"
+  wait 0.4s
+
+  cut to close on Blob
+  Blob emote surprised
+  Blob (nervous): "Is it really?" audio "audio/blob_02.wav"
+  wait 0.8s
+
+  cut to medium on Marta
+  Marta (annoyed): "I'm leaving." audio "audio/marta_03.wav"
+  Marta shakes_head
+
+  camera wide from east move dolly_out for 5s
+  Marta stands
+  Marta walks_to diner.door
+  Blob waves
+  wait 3.2s
+}

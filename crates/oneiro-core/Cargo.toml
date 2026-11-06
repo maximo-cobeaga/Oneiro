@@ -1,0 +1,9 @@
+[package]
+name = "oneiro-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+oneiro-lang = { path = "../oneiro-lang" }
+oneiro-audio = { path = "../oneiro-audio" }

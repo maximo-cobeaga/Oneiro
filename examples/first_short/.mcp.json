@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "oneiro": {
+      "command": "oneiro-mcp",
+      "args": ["."]
+    }
+  }
+}
