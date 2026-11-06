@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/img/logo.png" width="140" alt="Oneiro logo"></p>
+
 # Oneiro
 
 > A language and studio for making consistent, character-driven animated series — written by humans, directed by AI.
@@ -40,6 +42,8 @@ scene 1 "Late order" in diner {
 - **3D toon style:** characters as real 3D geometry with cel shading, ink outlines and simulated cloth capes and springy tails; a GPU (wgpu) renderer with an automatic CPU fallback. See [docs/10-toon3d.md](docs/10-toon3d.md).
 
 - **Polish and 3D world:** transitions, the `ink` style, walking around furniture, `oneiro new`, 3D props, imported `.obj` models, paper-doll characters and `oneiro doctor`. See [docs/11-polish.md](docs/11-polish.md) and [docs/12-world.md](docs/12-world.md).
+
+- **Open sets:** scenarios that are not rooms: painted backdrops on four sides plus animated sprites, painted by you or by the AI (see [docs/14-open-sets.md](docs/14-open-sets.md)). Interface in English and Spanish.
 
 New here? Read [QUICKSTART.md](QUICKSTART.md); to test every tool with your own story, follow [docs/13-first-story.md](docs/13-first-story.md).
 

@@ -1,5 +1,6 @@
 //! Application state and top-level layout of Oneiro Studio.
 
+use crate::i18n::tr;
 use crate::ai::AiState;
 use crate::builder::BuilderState;
 use crate::cutter::CutterState;
@@ -115,6 +116,7 @@ pub struct App {
     pub screenshot_requested: bool,
     pub ai_phase: u8,
     pub recent: Vec<PathBuf>,
+    pub logo: Option<egui::TextureHandle>,
     pub new_project: Option<crate::welcome::NewProject>,
     pub quick: Option<crate::welcome::Quick>,
 }
@@ -158,6 +160,7 @@ impl App {
             screenshot_requested: false,
             ai_phase: 0,
             recent: crate::welcome::load_recent(),
+            logo: None,
             new_project: None,
             quick: None,
         };
@@ -325,6 +328,9 @@ impl App {
         if self.playing {
             self.playing = false;
         } else {
+            if self.audio.after.is_none() && self.ensure_voices(crate::studio::AfterVoices::Play) {
+                return;
+            }
             if self.t >= self.duration() - 1e-6 {
                 self.t = 0.0;
             }
@@ -349,6 +355,9 @@ impl App {
     }
 
     pub fn start_export(&mut self, out: PathBuf, w: u32, h: u32, preview: bool) {
+        if self.audio.after.is_none() && self.ensure_voices(crate::studio::AfterVoices::Export(out.clone(), w, h, preview)) {
+            return;
+        }
         let Some(ws) = &self.ws else { return };
         if !ws.valid {
             self.status = "Fix the errors in the script before rendering".into();
@@ -373,17 +382,17 @@ impl App {
 
     fn menu(&mut self, ui: &mut egui::Ui) {
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("File", |ui| {
-                if ui.button("New project...      Ctrl+N").clicked() {
+            ui.menu_button(tr("File"), |ui| {
+                if ui.button(tr("New project...      Ctrl+N")).clicked() {
                     self.new_project = Some(crate::welcome::NewProject::new());
                     ui.close();
                 }
-                if ui.button("Open project...     Ctrl+O").clicked() {
+                if ui.button(tr("Open project...     Ctrl+O")).clicked() {
                     self.pick_and_open();
                     ui.close();
                 }
                 ui.add_enabled_ui(!self.recent.is_empty(), |ui| {
-                    ui.menu_button("Open recent", |ui| {
+                    ui.menu_button(tr("Open recent"), |ui| {
                         let list = self.recent.clone();
                         for p in list {
                             let label = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
@@ -395,7 +404,7 @@ impl App {
                     });
                 });
                 ui.separator();
-                if ui.add_enabled(self.ws.is_some(), egui::Button::new("Save all      Ctrl+S")).clicked() {
+                if ui.add_enabled(self.ws.is_some(), egui::Button::new(tr("Save all      Ctrl+S"))).clicked() {
                     self.save_all();
                     ui.close();
                 }
@@ -421,18 +430,28 @@ impl App {
                     }
                 }
                 ui.separator();
-                if ui.button("Quit").clicked() {
+                if ui.button(tr("Quit")).clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
-            ui.menu_button("View", |ui| {
-                ui.checkbox(&mut self.vp.free, "Free camera (right-drag to orbit)");
-                ui.checkbox(&mut self.vp.show_labels, "Actor labels");
-                ui.checkbox(&mut self.looping, "Loop playback");
-                ui.checkbox(&mut self.follow_cursor, "Playhead follows editor cursor");
+            ui.menu_button(tr("View"), |ui| {
+                ui.checkbox(&mut self.vp.free, tr("Free camera (right-drag to orbit)"));
+                ui.checkbox(&mut self.vp.show_labels, tr("Actor labels"));
+                ui.checkbox(&mut self.looping, tr("Loop playback"));
+                ui.menu_button(tr("Language"), |ui| {
+                    if ui.selectable_label(!crate::i18n::is_spanish(), "English").clicked() {
+                        crate::i18n::set_spanish(false);
+                        ui.close();
+                    }
+                    if ui.selectable_label(crate::i18n::is_spanish(), "Español").clicked() {
+                        crate::i18n::set_spanish(true);
+                        ui.close();
+                    }
+                });
+                ui.checkbox(&mut self.follow_cursor, tr("Playhead follows editor cursor"));
             });
-            ui.menu_button("Help", |ui| {
-                if ui.button("Shortcuts and tips").clicked() {
+            ui.menu_button(tr("Help"), |ui| {
+                if ui.button(tr("Shortcuts and tips")).clicked() {
                     self.show_help = true;
                     ui.close();
                 }
@@ -442,24 +461,24 @@ impl App {
 
     fn transport(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if ui.button("|<").on_hover_text("Go to start (Home)").clicked() {
+            if ui.button("|<").on_hover_text(tr("Go to start (Home)")).clicked() {
                 self.seek(0.0);
             }
-            if ui.button("<").on_hover_text("Previous frame (Left)").clicked() {
+            if ui.button("<").on_hover_text(tr("Previous frame (Left)")).clicked() {
                 self.playing = false;
                 let f = 1.0 / self.fps();
                 self.seek(self.t - f);
             }
-            let label = if self.playing { "Pause" } else { "Play" };
-            if ui.add(egui::Button::new(RichText::new(label).strong()).min_size(egui::vec2(58.0, 0.0))).on_hover_text("Space").clicked() {
+            let label = if self.playing { crate::i18n::tr("Pause") } else { crate::i18n::tr("Play") };
+            if ui.add(egui::Button::new(RichText::new(label).strong()).min_size(egui::vec2(58.0, 0.0))).on_hover_text(tr("Space")).clicked() {
                 self.toggle_play();
             }
-            if ui.button(">").on_hover_text("Next frame (Right)").clicked() {
+            if ui.button(">").on_hover_text(tr("Next frame (Right)")).clicked() {
                 self.playing = false;
                 let f = 1.0 / self.fps();
                 self.seek(self.t + f);
             }
-            if ui.button(">|").on_hover_text("Go to end (End)").clicked() {
+            if ui.button(">|").on_hover_text(tr("Go to end (End)")).clicked() {
                 self.seek(self.duration());
             }
             ui.separator();
@@ -468,7 +487,7 @@ impl App {
             ui.separator();
             let valid = self.ws.as_ref().map_or(true, |w| w.valid);
             if !valid {
-                ui.label(RichText::new("script has errors - showing last valid version").color(Color32::from_rgb(240, 120, 110)));
+                ui.label(RichText::new(tr("script has errors - showing last valid version")).color(Color32::from_rgb(240, 120, 110)));
             }
         });
     }
@@ -496,13 +515,13 @@ impl App {
             if let Some(r) = finished {
                 done = Some(r);
             } else {
-                egui::Window::new("Rendering video").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+                egui::Window::new(tr("Rendering video")).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
                     let p = job.progress.load(Ordering::Relaxed);
                     let frac = p as f32 / job.total.max(1) as f32;
                     ui.label(format!("{}", job.out.display()));
                     ui.add(egui::ProgressBar::new(frac).show_percentage().desired_width(360.0));
                     ui.label(format!("frame {} / {}   {:.0}s elapsed", p, job.total, job.started.elapsed().as_secs_f32()));
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(tr("Cancel")).clicked() {
                         job.cancel.store(true, Ordering::Relaxed);
                     }
                 });
@@ -530,17 +549,17 @@ impl App {
 
     fn help_window(&mut self, ctx: &egui::Context) {
         let mut open = self.show_help;
-        egui::Window::new("Oneiro Studio - shortcuts and tips").open(&mut open).show(ctx, |ui| {
-            ui.label("Playback");
+        egui::Window::new(tr("Oneiro Studio - shortcuts and tips")).open(&mut open).show(ctx, |ui| {
+            ui.label(tr("Playback"));
             ui.monospace("Space        play / pause\nLeft / Right step one frame\nHome / End   jump to start / end");
             ui.separator();
-            ui.label("Viewport");
+            ui.label(tr("Viewport"));
             ui.monospace("Click an actor to select it; drag it to move its starting position (pinned in the .onlock).\nFree camera: right-drag orbit, middle-drag pan, wheel zoom.");
             ui.separator();
-            ui.label("Record motion");
+            ui.label(tr("Record motion"));
             ui.monospace("Pick a character, press Record, drive it with WASD / arrows (Shift = run),\npress Stop and insert the generated lines into the script. Esc cancels.");
             ui.separator();
-            ui.label("Editing");
+            ui.label(tr("Editing"));
             ui.monospace("Ctrl+S       save everything\nClick a diagnostic to jump to it. Click timeline blocks to jump to their script line.");
         });
         self.show_help = open;
@@ -549,9 +568,9 @@ impl App {
     fn take_window(&mut self, ctx: &egui::Context) {
         let mut action: Option<bool> = None;
         if let Some(take) = &self.take {
-            egui::Window::new("Recorded motion").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+            egui::Window::new(tr("Recorded motion")).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
                 if take.lines.is_empty() {
-                    ui.label("The character barely moved - nothing to insert.");
+                    ui.label(tr("The character barely moved - nothing to insert."));
                 } else {
                     ui.label(format!("{} move(s) for {} will be inserted after line {}:", take.lines.len(), take.actor, take.insert_after_line));
                     for l in &take.lines {
@@ -559,10 +578,10 @@ impl App {
                     }
                 }
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(!take.lines.is_empty(), egui::Button::new("Insert into script")).clicked() {
+                    if ui.add_enabled(!take.lines.is_empty(), egui::Button::new(tr("Insert into script"))).clicked() {
                         action = Some(true);
                     }
-                    if ui.button("Discard").clicked() {
+                    if ui.button(tr("Discard")).clicked() {
                         action = Some(false);
                     }
                 });
@@ -634,6 +653,7 @@ impl eframe::App for App {
         self.frame_counter += 1;
         self.tick(&ctx);
         self.shortcuts(&ctx);
+        self.audio.ctx = Some(ctx.clone());
         self.poll_voice();
         self.sync_audio();
 

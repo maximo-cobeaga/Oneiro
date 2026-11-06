@@ -2,6 +2,7 @@
 //! that can see) propose where the head, body, arm and leg are, drag the boxes to fix them, watch the
 //! validator and the assembled puppet update, and create a normal character.
 
+use crate::i18n::tr;
 use crate::app::{App, RightTab};
 use eframe::egui::{self, Color32, Pos2, Rect, RichText, Sense, Stroke, TextureOptions};
 use oneiro_ai::cutter_ai::{propose_with_ai, CutProposal};
@@ -129,7 +130,7 @@ impl App {
     fn ui_cutter_inner(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         if self.ws.is_none() {
-            ui.label("No project open.");
+            ui.label(tr("No project open."));
             return;
         }
         // Result of a running AI proposal.
@@ -153,13 +154,13 @@ impl App {
         }
 
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Open illustration...").clicked() {
+            if ui.button(tr("Open illustration...")).clicked() {
                 if let Some(p) = rfd::FileDialog::new().set_title("Illustration of one character").add_filter("Images", &["png", "jpg", "jpeg", "webp", "bmp", "gif"]).pick_file() {
                     self.cutter.open(&ctx, p);
                 }
             }
             let have = self.cutter.mask.is_some();
-            if ui.add_enabled(have, egui::Button::new("Propose automatically")).on_hover_text("Finds the neck, hips and torso from the silhouette").clicked() {
+            if ui.add_enabled(have, egui::Button::new(tr("Propose automatically"))).on_hover_text(tr("Finds the neck, hips and torso from the silhouette")).clicked() {
                 if let Some(m) = self.cutter.mask.clone() {
                     match propose(&m) {
                         Ok(l) => {
@@ -172,7 +173,7 @@ impl App {
                 }
             }
             let busy = self.cutter.job.is_some();
-            if ui.add_enabled(have && !busy, egui::Button::new("Propose with AI")).on_hover_text("A vision model looks at the picture; the engine checks its boxes and sends it back to fix them. Uses the provider of the AI tab.").clicked() {
+            if ui.add_enabled(have && !busy, egui::Button::new(tr("Propose with AI"))).on_hover_text(tr("A vision model looks at the picture; the engine checks its boxes and sends it back to fix them. Uses the provider of the AI tab.")).clicked() {
                 self.cutter_ai_propose(&ctx);
             }
         });
@@ -188,8 +189,8 @@ impl App {
         }
         let (Some(img), Some(_)) = (self.cutter.img.clone(), self.cutter.layout.as_ref()) else {
             ui.add_space(8.0);
-            ui.label("Cut a character out of an illustration:");
-            ui.label(RichText::new("1. Open a picture of ONE character seen from the front, standing, arms at the sides, on a plain background (or a PNG with transparency).\n2. Oneiro proposes where the head, body, arm and leg are. Drag the boxes if needed: the arm and the leg are the ones on the LEFT of the picture; the right ones are mirrored.\n3. Fix what the checker reports, name it and create the character: it is animated, lip-synced to your audio only if its face is drawn by Oneiro, and works in any style.").weak().small());
+            ui.label(tr("Cut a character out of an illustration:"));
+            ui.label(RichText::new(tr("1. Open a picture of ONE character seen from the front, standing, arms at the sides, on a plain background (or a PNG with transparency).\n2. Oneiro proposes where the head, body, arm and leg are. Drag the boxes if needed: the arm and the leg are the ones on the LEFT of the picture; the right ones are mirrored.\n3. Fix what the checker reports, name it and create the character: it is animated, lip-synced to your audio only if its face is drawn by Oneiro, and works in any style.")).weak().small());
             return;
         };
 
@@ -293,7 +294,7 @@ impl App {
         // ------------------------------------------------------------ validator
         ui.add_space(4.0);
         if self.cutter.issues.is_empty() {
-            ui.label(RichText::new("The layout looks good.").color(Color32::from_rgb(120, 220, 150)));
+            ui.label(RichText::new(tr("The layout looks good.")).color(Color32::from_rgb(120, 220, 150)));
         }
         for i in &self.cutter.issues {
             let col = if i.is_error() { Color32::from_rgb(240, 120, 110) } else { Color32::from_rgb(240, 200, 90) };
@@ -305,7 +306,7 @@ impl App {
         if let Some(tex) = &self.cutter.preview {
             ui.horizontal(|ui| {
                 ui.add(egui::Image::new(egui::load::SizedTexture::new(tex.id(), egui::vec2(150.0, 190.0))));
-                ui.label(RichText::new("The puppet assembled from the pieces (it turns, walks and gestures like any character).").weak().small());
+                ui.label(RichText::new(tr("The puppet assembled from the pieces (it turns, walks and gestures like any character).")).weak().small());
             });
         }
 
@@ -313,9 +314,9 @@ impl App {
         ui.separator();
         let mut create = false;
         ui.horizontal(|ui| {
-            ui.label("Name");
-            ui.add(egui::TextEdit::singleline(&mut self.cutter.name).hint_text("Capitalized").desired_width(110.0));
-            ui.label("height");
+            ui.label(tr("Name"));
+            ui.add(egui::TextEdit::singleline(&mut self.cutter.name).hint_text(tr("Capitalized")).desired_width(110.0));
+            ui.label(tr("height"));
             ui.add(egui::DragValue::new(&mut self.cutter.height_m).range(0.3..=2.5).speed(0.01).suffix(" m"));
             egui::ComboBox::from_id_salt("cut_style").selected_text(if self.cutter.style.is_empty() { "(default style)".to_string() } else { self.cutter.style.clone() }).show_ui(ui, |ui| {
                 ui.selectable_value(&mut self.cutter.style, String::new(), "(default style)");
@@ -327,13 +328,13 @@ impl App {
         let name_ok = oneiro_cutter::valid_name(&self.cutter.name);
         let can = self.cutter.errors() == 0 && name_ok;
         ui.horizontal(|ui| {
-            if ui.add_enabled(can, egui::Button::new(RichText::new("Create character").strong())).clicked() {
+            if ui.add_enabled(can, egui::Button::new(RichText::new(tr("Create character")).strong())).clicked() {
                 create = true;
             }
             if !name_ok {
-                ui.label(RichText::new("the name must start with a capital letter (letters, digits, _)").weak().small());
+                ui.label(RichText::new(tr("the name must start with a capital letter (letters, digits, _)")).weak().small());
             } else if self.cutter.errors() > 0 {
-                ui.label(RichText::new("fix the errors above first").weak().small());
+                ui.label(RichText::new(tr("fix the errors above first")).weak().small());
             }
         });
         if create {

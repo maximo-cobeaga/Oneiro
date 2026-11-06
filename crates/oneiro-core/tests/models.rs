@@ -87,3 +87,40 @@ fn scaffolded_projects_compile_in_both_templates() {
     assert!(valid_name("Marta_2") && !valid_name("2fast") && !valid_name("a b") && !valid_name(""));
     assert_eq!(folder_name("  My Great Show! "), "My-Great-Show");
 }
+
+fn beach() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/beach").canonicalize().unwrap()
+}
+
+#[test]
+fn an_open_set_loads_its_backdrops_and_sprites() {
+    let mut d = vec![];
+    let p = Project::load(&beach(), &mut d);
+    assert!(d.is_empty(), "{:?}", d.iter().map(|x| x.render()).collect::<Vec<_>>());
+    let s = &p.sets["beach"];
+    assert!(s.open && s.backdrops.len() == 4 && s.sprites.len() == 7);
+    assert!(s.backdrops.values().all(|b| b.raster.is_some()) && s.sprites.iter().all(|x| x.art.raster.is_some()));
+    assert_eq!((s.width, s.depth), (16.0, 12.0));
+    assert_eq!(s.sprites.iter().find(|x| x.name == "palm_1").unwrap().anim, "sway");
+}
+
+#[test]
+fn open_set_mistakes_are_explained() {
+    let dir = std::env::temp_dir().join(format!("oneiro_open_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("library/sets")).unwrap();
+    std::fs::write(dir.join("oneiro.toml"), "name = \"t\"\n").unwrap();
+    let load = |body: &str| {
+        std::fs::write(dir.join("library/sets/s.onset"), format!("set s {{\n  kind: open\n{}\n}}\n", body)).unwrap();
+        let mut d = vec![];
+        Project::load(&dir, &mut d);
+        d.iter().map(|x| format!("{} {}", x.code, x.message)).collect::<Vec<_>>()
+    };
+    assert!(load("  backdrops {\n    up: \"a.svg\"\n  }").iter().any(|m| m.starts_with("E1125") && m.contains("backdrop side")));
+    assert!(load("  backdrops {\n    north: \"missing.svg\"\n  }").iter().any(|m| m.starts_with("E1126") && m.contains("cannot read")));
+    assert!(load("  backdrops {\n    north: \"../x.svg\"\n  }").iter().any(|m| m.starts_with("E1126") && m.contains("inside the project")));
+    assert!(load("  sprites {\n    a: { height: 2 }\n  }").iter().any(|m| m.starts_with("E1123")));
+    assert!(load("  sprites {\n    a: { image: \"x.svg\", anim: wobble }\n  }").iter().any(|m| m.starts_with("E1124") && m.contains("wobble")));
+    assert!(load("  sky: 12").iter().any(|m| m.starts_with("E1125")));
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -506,6 +506,12 @@ pub struct SetDef {
     pub trim: Rgb,
     /// Default look of the props: `flat` (2D) or `toon_3d`.
     pub look: String,
+    /// `kind: open`: no walls or ceiling; sky, ground, painted backdrops on the four sides and sprites.
+    pub open: bool,
+    pub sky: (Rgb, Rgb),
+    pub ground: Rgb,
+    pub backdrops: BTreeMap<String, crate::scenery::Scenery>,
+    pub sprites: Vec<crate::scenery::Sprite>,
 }
 
 pub fn dir_yaw(name: &str) -> Option<f64> {
@@ -541,6 +547,11 @@ impl SetDef {
             floor_alt: Rgb(52, 52, 66),
             trim: Rgb(150, 40, 48),
             look: "flat".into(),
+            open: false,
+            sky: (Rgb(120, 190, 240), Rgb(255, 244, 214)),
+            ground: Rgb(226, 208, 150),
+            backdrops: BTreeMap::new(),
+            sprites: Vec::new(),
         };
         for e in &b.entries {
             match e.key.as_str() {
@@ -599,6 +610,7 @@ impl SetDef {
                 _ => {}
             }
         }
+        s.parse_open(b, file, diags);
         s
     }
 }

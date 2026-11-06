@@ -1,6 +1,7 @@
 //! The 3D viewport: renders the current frame with the real renderer (what you see is what the
 //! export produces), plus a free orbit camera, actor picking/dragging and motion recording.
 
+use crate::i18n::tr;
 use crate::app::{App, Take};
 use crate::record::{emit, step_puppet, Puppet, Recorder, Sample};
 use crate::textops::statement_end_line;
@@ -84,9 +85,9 @@ impl App {
         let Some(ep) = self.ws.as_ref().map(|w| w.episode.clone()) else {
             ui.vertical_centered(|ui| {
                 ui.add_space(ui.available_height() * 0.35);
-                ui.heading("Oneiro Studio");
-                ui.label("Open a project folder to start.");
-                if ui.button("Open project...").clicked() {
+                ui.heading(tr("Oneiro Studio"));
+                ui.label(tr("Open a project folder to start."));
+                if ui.button(tr("Open project...")).clicked() {
                     if let Some(p) = rfd::FileDialog::new().set_title("Open an Oneiro project folder").pick_folder() {
                         self.open_project(&p);
                     }
@@ -106,14 +107,14 @@ impl App {
         let mut cancel_rec = false;
         ui.horizontal(|ui| {
             let was_free = self.vp.free;
-            ui.selectable_value(&mut self.vp.free, false, "Shot camera");
-            ui.selectable_value(&mut self.vp.free, true, "Free camera");
+            ui.selectable_value(&mut self.vp.free, false, tr("Shot camera"));
+            ui.selectable_value(&mut self.vp.free, true, tr("Free camera"));
             if self.vp.free && !was_free {
                 if let Some((si, lt)) = ep.locate(self.t) {
                     self.vp.cam = FreeCam::from_pose(&ep.scenes[si].camera_at(lt));
                 }
             }
-            ui.checkbox(&mut self.vp.show_labels, "Labels");
+            ui.checkbox(&mut self.vp.show_labels, tr("Labels"));
             ui.separator();
             if self.recorder.is_none() {
                 let mut sel = self.sel_actor.clone().filter(|s| actor_names.contains(s)).or_else(|| actor_names.first().cloned());
@@ -125,16 +126,16 @@ impl App {
                 if sel != self.sel_actor && sel.is_some() {
                     self.sel_actor = sel;
                 }
-                if ui.add_enabled(!actor_names.is_empty() && valid, egui::Button::new(RichText::new("● Record motion").color(Color32::from_rgb(240, 100, 100)))).on_hover_text("Drive the selected character with WASD / arrows and turn it into script lines").clicked() {
+                if ui.add_enabled(!actor_names.is_empty() && valid, egui::Button::new(RichText::new(tr("● Record motion")).color(Color32::from_rgb(240, 100, 100)))).on_hover_text(tr("Drive the selected character with WASD / arrows and turn it into script lines")).clicked() {
                     start_rec = true;
                 }
             } else {
                 let rec = self.recorder.as_ref().unwrap();
                 ui.label(RichText::new(format!("● REC {}  {:.1}s", rec.actor, rec.clock)).color(Color32::from_rgb(255, 90, 90)).strong());
-                if ui.button("Stop").clicked() {
+                if ui.button(tr("Stop")).clicked() {
                     stop_rec = true;
                 }
-                if ui.button("Cancel (Esc)").clicked() {
+                if ui.button(tr("Cancel (Esc)")).clicked() {
                     cancel_rec = true;
                 }
             }

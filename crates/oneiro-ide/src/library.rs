@@ -1,5 +1,6 @@
 //! Left panel: the project's library (episodes, characters, sets, sounds).
 
+use crate::i18n::tr;
 use crate::app::{App, RightTab};
 use eframe::egui::{self, RichText, TextureOptions};
 use oneiro_audio::read_wav;
@@ -8,9 +9,9 @@ use oneiro_render::preview::{character_portrait, set_preview, PortraitOpts};
 impl App {
     pub fn ui_library(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
-        ui.heading("Library");
+        ui.heading(tr("Library"));
         let Some(ws) = self.ws.as_ref() else {
-            ui.label("No project open.");
+            ui.label(tr("No project open."));
             return;
         };
         ui.label(RichText::new(ws.project.manifest.name.clone()).strong());
@@ -32,18 +33,18 @@ impl App {
         let mut open_studio = false;
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            egui::CollapsingHeader::new(RichText::new("Episodes").strong()).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Episodes")).strong()).default_open(true).show(ui, |ui| {
                 for s in &scripts {
                     let label = s.strip_prefix(&root).unwrap_or(s).to_string_lossy().replace('\\', "/");
                     if ui.selectable_label(*s == active_script, label).clicked() {
                         open_script = Some(s.clone());
                     }
                 }
-                if ui.button("+ New episode").clicked() {
+                if ui.button(tr("+ New episode")).clicked() {
                     quick = Some(crate::welcome::QuickKind::Episode);
                 }
             });
-            egui::CollapsingHeader::new(RichText::new("Characters").strong()).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Characters")).strong()).default_open(true).show(ui, |ui| {
                 for (name, src) in &characters {
                     let key = oneiro_core::math::hash_str(src);
                     let stale = self.thumbs.get(name).map_or(true, |(k, _)| *k != key);
@@ -63,17 +64,17 @@ impl App {
                             if ui.selectable_label(self.builder.draft.as_ref().map_or(false, |d| &d.name == name), name).clicked() {
                                 pick_char = Some(name.clone());
                             }
-                            if ui.small_button("source").on_hover_text("Edit the .onchar text").clicked() {
+                            if ui.small_button(tr("source")).on_hover_text(tr("Edit the .onchar text")).clicked() {
                                 open_doc = Some(root.join("library").join("characters").join(format!("{}.onchar", name)));
                             }
                         });
                     });
                 }
-                if ui.button("+ New character").clicked() {
+                if ui.button(tr("+ New character")).clicked() {
                     new_char = true;
                 }
             });
-            egui::CollapsingHeader::new(RichText::new("Sets").strong()).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Sets")).strong()).default_open(true).show(ui, |ui| {
                 for (name, set) in &sets {
                     let key = oneiro_core::math::hash_str(&format!("{:?}", set));
                     let stale = self.set_thumbs.get(name).map_or(true, |(k, _)| *k != key);
@@ -90,25 +91,25 @@ impl App {
                         ui.label(name);
                         ui.label(RichText::new(format!("{} x {} m, {} anchors", set.width, set.depth, set.anchors.len())).weak().small());
                     });
-                    if ui.small_button("edit source").clicked() {
+                    if ui.small_button(tr("edit source")).clicked() {
                         open_doc = Some(root.join("library").join("sets").join(format!("{}.onset", name)));
                     }
                     ui.add_space(4.0);
                 }
-                if ui.button("+ New set").clicked() {
+                if ui.button(tr("+ New set")).clicked() {
                     quick = Some(crate::welcome::QuickKind::Set);
                 }
             });
-            egui::CollapsingHeader::new(RichText::new("Sounds").strong()).default_open(false).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Sounds")).strong()).default_open(false).show(ui, |ui| {
                 if sounds.is_empty() {
-                    ui.label(RichText::new("No sounds yet. Create some in the Audio tab.").weak().small());
+                    ui.label(RichText::new(tr("No sounds yet. Create some in the Audio tab.")).weak().small());
                 }
                 for s in &sounds {
                     let label = s.strip_prefix(&root).unwrap_or(s).to_string_lossy().replace('\\', "/");
                     let dur = read_wav(s).map(|a| a.duration()).unwrap_or(0.0);
                     ui.label(format!("{}  ({:.1}s)", label, dur));
                 }
-                if ui.button("Open the sound studio").clicked() {
+                if ui.button(tr("Open the sound studio")).clicked() {
                     open_studio = true;
                 }
             });

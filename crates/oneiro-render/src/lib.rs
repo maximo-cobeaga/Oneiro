@@ -4,6 +4,7 @@
 pub mod character;
 pub mod clay;
 pub mod ink;
+pub mod open;
 pub mod paperdoll;
 pub mod draw;
 pub mod encode;
@@ -40,6 +41,7 @@ fn tint_of(tod: &str) -> [f64; 3] {
 enum Item {
     Piece { prop: usize, piece: usize },
     Actor(usize),
+    Sprite(usize),
 }
 
 impl<'a> Renderer<'a> {
@@ -73,16 +75,22 @@ impl<'a> Renderer<'a> {
         }
         if let Some((pose_out, pose_in, m, kind)) = sc.transition_at(lt) {
             let (need_out, need_in) = transition::needs(kind, m);
-            let out = need_out.then(|| self.render_scene(sc, pose_out, frames.clone()));
-            let inc = need_in.then(|| self.render_scene(sc, pose_in, frames.clone()));
+            let out = need_out.then(|| self.render_scene_at(sc, pose_out, frames.clone(), lt));
+            let inc = need_in.then(|| self.render_scene_at(sc, pose_in, frames.clone(), lt));
             return transition::blend(kind, out.as_ref(), inc.as_ref(), m);
         }
-        self.render_scene(sc, sc.camera_at(lt), frames)
+        self.render_scene_at(sc, sc.camera_at(lt), frames, lt)
     }
 
     /// Renders one scene with an explicit camera and actor frames (used by the IDE for free
     /// cameras and live puppeteering).
     pub fn render_scene(&self, sc: &Scene, pose: oneiro_core::CameraPose, frames: Vec<ActorFrame>) -> Pixmap {
+        let t = frames.first().map(|f| f.t).unwrap_or(0.0);
+        self.render_scene_at(sc, pose, frames, t)
+    }
+
+    /// Like `render_scene`, with the scene time (it drives the animation of sprites).
+    pub fn render_scene_at(&self, sc: &Scene, pose: oneiro_core::CameraPose, frames: Vec<ActorFrame>, time: f64) -> Pixmap {
         let (w, h) = (self.width, self.height);
         let mut pm = Pixmap::new(w, h).expect("pixmap");
         pm.fill(Color::from_rgba8(20, 18, 26, 255));
@@ -91,7 +99,11 @@ impl<'a> Renderer<'a> {
         let px = h as f32 / 1080.0;
 
         let mut p = Painter { pm: &mut pm, tf: Transform::identity(), ow: 2.2 * px, tint };
-        set::draw_shell(&mut p, &cam, &sc.set, &sc.time_of_day, px);
+        if sc.set.open {
+            open::draw_open_shell(&mut p, &cam, &sc.set);
+        } else {
+            set::draw_shell(&mut p, &cam, &sc.set, &sc.time_of_day, px);
+        }
 
         // Contact shadows on the floor.
         for fr in &frames {
@@ -131,6 +143,9 @@ impl<'a> Renderer<'a> {
             let c = cam.to_cam([fr.kin.pos[0], 0.0, fr.kin.pos[1]]);
             items.push((c[2] - 0.2, Item::Actor(fr.idx)));
         }
+        for (i, sp) in sc.set.sprites.iter().enumerate() {
+            items.push((open::sprite_depth(&cam, sp), Item::Sprite(i)));
+        }
         items.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
         for (_, item) in items {
@@ -144,6 +159,7 @@ impl<'a> Renderer<'a> {
                     }
                     set::draw_piece(&mut p, &cam, &sc.set, prop, piece, px);
                 }
+                Item::Sprite(i) => open::draw_sprite(p.pm, &cam, &sc.set.sprites[i], tint, time),
                 Item::Actor(i) => {
                     let fr = &frames[i];
                     self.draw_actor(&mut p, sc, &cam, fr, tint, px);

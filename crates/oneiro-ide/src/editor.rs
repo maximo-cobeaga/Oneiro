@@ -1,6 +1,7 @@
 //! Right-hand panel: tabs (Script / Character / Inspector) and the script editor with syntax
 //! highlighting, diagnostics, a directing palette and live recompilation.
 
+use crate::i18n::tr;
 use crate::app::{App, RightTab};
 use crate::highlight::layout_job;
 use crate::textops::{insert_at_cursor, line_col_to_char, line_of_char, line_start};
@@ -13,12 +14,12 @@ use std::time::Instant;
 impl App {
     pub fn ui_right(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.right_tab, RightTab::Script, "Script");
-            ui.selectable_value(&mut self.right_tab, RightTab::Character, "Character builder");
-            ui.selectable_value(&mut self.right_tab, RightTab::Inspector, "Inspector");
-            ui.selectable_value(&mut self.right_tab, RightTab::Audio, "Audio");
-            ui.selectable_value(&mut self.right_tab, RightTab::Cutter, "Cutter");
-            ui.selectable_value(&mut self.right_tab, RightTab::Ai, "AI");
+            ui.selectable_value(&mut self.right_tab, RightTab::Script, tr("Script"));
+            ui.selectable_value(&mut self.right_tab, RightTab::Character, tr("Character builder"));
+            ui.selectable_value(&mut self.right_tab, RightTab::Inspector, tr("Inspector"));
+            ui.selectable_value(&mut self.right_tab, RightTab::Audio, tr("Audio"));
+            ui.selectable_value(&mut self.right_tab, RightTab::Cutter, tr("Cutter"));
+            ui.selectable_value(&mut self.right_tab, RightTab::Ai, tr("AI"));
         });
         ui.separator();
         match self.right_tab {
@@ -59,8 +60,8 @@ impl App {
         let mut insert: Option<String> = None;
 
         egui::CollapsingHeader::new(RichText::new(format!("Direct: lines for {}", who)).strong()).default_open(false).show(ui, |ui| {
-            ui.label(RichText::new("Click to insert a line after the cursor.").weak().small());
-            ui.label("Actions");
+            ui.label(RichText::new(tr("Click to insert a line after the cursor.")).weak().small());
+            ui.label(tr("Actions"));
             ui.horizontal_wrapped(|ui| {
                 for v in IMPLEMENTED_VERBS {
                     if *v == "emote" || *v == "stops" {
@@ -76,9 +77,9 @@ impl App {
                     }
                 }
             });
-            ui.label("Faces and dialogue");
+            ui.label(tr("Faces and dialogue"));
             ui.horizontal_wrapped(|ui| {
-                if ui.small_button("dialogue").clicked() {
+                if ui.small_button(tr("dialogue")).clicked() {
                     insert = Some(format!("{} (neutral): \"...\"", who));
                 }
                 for e in EXPRESSIONS {
@@ -87,7 +88,7 @@ impl App {
                     }
                 }
             });
-            ui.label("Camera");
+            ui.label(tr("Camera"));
             ui.horizontal_wrapped(|ui| {
                 for s in SHOTS {
                     if ui.small_button(*s).clicked() {
@@ -102,25 +103,25 @@ impl App {
                 }
             });
             ui.horizontal_wrapped(|ui| {
-                ui.label("move:");
+                ui.label(tr("move:"));
                 for m in MOVES {
                     if *m != "static" && ui.small_button(*m).clicked() {
                         insert = Some(format!("camera medium on {} move {} for 3s", who, m));
                     }
                 }
             });
-            ui.label("Timing and sound");
+            ui.label(tr("Timing and sound"));
             ui.horizontal_wrapped(|ui| {
-                if ui.small_button("wait 1s").clicked() {
+                if ui.small_button(tr("wait 1s")).clicked() {
                     insert = Some("wait 1s".into());
                 }
                 if ui.small_button("together { }").clicked() {
                     insert = Some(format!("together {{\n    {} nods\n  }}", who));
                 }
-                if ui.small_button("sfx").clicked() {
+                if ui.small_button(tr("sfx")).clicked() {
                     insert = Some("sfx door_bell".into());
                 }
-                if ui.small_button("time: night").clicked() {
+                if ui.small_button(tr("time: night")).clicked() {
                     insert = Some("time: night".into());
                 }
             });
@@ -133,7 +134,7 @@ impl App {
     pub fn ui_script(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         if self.ws.is_none() {
-            ui.label("No project open.");
+            ui.label(tr("No project open."));
             return;
         }
         // ------------------------------------------------------------ document tabs
@@ -152,7 +153,7 @@ impl App {
                 }
             }
             ui.separator();
-            if ui.button("Save (Ctrl+S)").clicked() {
+            if ui.button(tr("Save (Ctrl+S)")).clicked() {
                 save = true;
             }
         });
@@ -172,7 +173,7 @@ impl App {
         if is_script {
             self.palette(ui);
         } else {
-            ui.label(RichText::new("Library file: save with Ctrl+S to reload the project.").weak().small());
+            ui.label(RichText::new(tr("Library file: save with Ctrl+S to reload the project.")).weak().small());
         }
 
         // ------------------------------------------------------------ diagnostics for the active doc
@@ -188,10 +189,10 @@ impl App {
         egui::Panel::bottom("diag_panel").resizable(true).default_size(120.0).min_size(46.0).show(ui, |ui| {
             let errors = diags.iter().filter(|d| d.is_error()).count();
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Problems").strong());
+                ui.label(RichText::new(tr("Problems")).strong());
                 let c = if errors > 0 { Color32::from_rgb(240, 110, 100) } else { Color32::from_rgb(120, 220, 150) };
                 ui.label(RichText::new(if diags.is_empty() { "none - the script is valid".to_string() } else { format!("{} error(s), {} warning(s)", errors, diags.len() - errors) }).color(c));
-                if errors > 0 && ui.small_button("Fix with AI").on_hover_text("Ask the AI to fix these problems (you review the change before applying)").clicked() {
+                if errors > 0 && ui.small_button(tr("Fix with AI")).on_hover_text(tr("Ask the AI to fix these problems (you review the change before applying)")).clicked() {
                     fix_with_ai = true;
                 }
             });

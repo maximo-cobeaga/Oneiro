@@ -371,7 +371,12 @@ pub fn solve(stmt: &CameraStmt, t: f64, env: &mut SolveEnv) -> Result<(CameraPos
             }
         }
     }
-    let _ = &mut cam_xz;
+    if stmt.from.is_none() {
+        // Automatic placement: never film a face through somebody else or a piece of furniture.
+        // In a close-up the counter edge is below the frame, so only a much higher obstacle spoils it.
+        let margin = if matches!(shot.as_str(), "close" | "extreme_close" | "medium_close") { -0.15 } else { 0.10 };
+        cam_xz = clear_view(env, cam_xz, &subject, sp, t, center_y, margin);
+    }
     let mut pose = CameraPose { pos: [cam_xz[0], center_y, cam_xz[1]], target, fov, roll };
     adjust_angle(&mut pose, angle);
     pose.pos[1] = pose.pos[1].max(0.15);
@@ -415,4 +420,62 @@ pub fn describe(stmt: &CameraStmt) -> String {
         s.push_str(&format!(" move {}", m));
     }
     s
+}
+
+/// Distance from point `p` to the segment `a -> b`, and where along it the closest point lies (0..1).
+fn seg_dist(a: V2, b: V2, p: V2) -> (f64, f64) {
+    let ab = [b[0] - a[0], b[1] - a[1]];
+    let l2 = (ab[0] * ab[0] + ab[1] * ab[1]).max(1e-9);
+    let u = (((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / l2).clamp(0.0, 1.0);
+    (dist2(p, [a[0] + ab[0] * u, a[1] + ab[1] * u]), u)
+}
+
+/// True when something (another character, or furniture) stands between the camera and the subject.
+fn view_blocked(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64, eye_y: f64, margin: f64) -> bool {
+    for a in env.actors.iter().filter(|a| a.name != subject) {
+        let p = a.kin(t).pos;
+        let (d, u) = seg_dist(cam, sp, p);
+        if u > 0.02 && u < 0.92 && d < 0.34 {
+            return true;
+        }
+    }
+    for p in env.set.props.iter() {
+        let Some(o) = crate::nav::footprint_of(p) else { continue };
+        // Furniture only hides what is behind it when the camera looks through it near or below its top.
+        let top = match p.kind.as_str() {
+            "counter" => p.h.unwrap_or(1.0),
+            "table" => p.h.unwrap_or(0.74),
+            "stool" => p.h.unwrap_or(0.6),
+            _ => p.h.unwrap_or(1.0),
+        };
+        if eye_y > top + margin {
+            continue;
+        }
+        if o.inflate(0.45).contains(sp) {
+            continue; // the subject is at this furniture: it is not "in the way"
+        }
+        if o.blocks(cam, sp) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Moves the camera around the subject (keeping its distance) to the nearest spot with a clear view.
+fn clear_view(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64, eye_y: f64, margin: f64) -> V2 {
+    if !view_blocked(env, cam, subject, sp, t, eye_y, margin) {
+        return cam;
+    }
+    let (dx, dz) = (cam[0] - sp[0], cam[1] - sp[1]);
+    for k in 1..=9 {
+        for sign in [1.0f64, -1.0] {
+            let th = sign * (k as f64) * 20.0f64.to_radians();
+            let c = [sp[0] + dx * th.cos() - dz * th.sin(), sp[1] + dx * th.sin() + dz * th.cos()];
+            if !view_blocked(env, c, subject, sp, t, eye_y, margin) {
+                return c;
+            }
+        }
+    }
+    // Everything is blocked: come closer instead.
+    [sp[0] + dx * 0.6, sp[1] + dz * 0.6]
 }

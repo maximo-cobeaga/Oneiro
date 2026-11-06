@@ -7,8 +7,10 @@ mod builder;
 mod cutter;
 mod editor;
 mod highlight;
+mod i18n;
 mod inspector;
 mod library;
+mod logo;
 mod record;
 mod studio;
 mod textops;
@@ -43,6 +45,11 @@ fn parse_args() -> StartupOpts {
             "--demo-record" => o.demo_record = true,
             "--demo-quick" => o.demo_quick = Some(val()),
             "--demo-new" => o.demo_new = true,
+            "--logo" => {
+                let path = val();
+                let _ = logo::render(512).save_png(&path);
+                std::process::exit(0);
+            }
             "--demo-insert" => o.demo_insert = Some(val()),
             "--export" => o.export = Some(PathBuf::from(val())),
             "--ai-provider" => o.ai_provider = Some(val()),
@@ -71,6 +78,7 @@ fn parse_args() -> StartupOpts {
 }
 
 fn main() -> eframe::Result<()> {
+    i18n::init();
     let opts = parse_args();
     let size = [opts.width.unwrap_or(1500.0), opts.height.unwrap_or(900.0)];
     let native = eframe::NativeOptions {
@@ -80,24 +88,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native("Oneiro Studio", native, Box::new(move |cc| Ok(Box::new(App::new(cc, opts.clone())))))
 }
 
-/// A small crescent moon on a violet square, drawn in code so the program needs no image file.
 fn icon() -> egui::IconData {
-    let n = 64usize;
-    let mut rgba = vec![0u8; n * n * 4];
-    for y in 0..n {
-        for x in 0..n {
-            let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
-            // Rounded square background.
-            let (dx, dy) = ((fx - 32.0).abs() - 24.0, (fy - 32.0).abs() - 24.0);
-            let inside = dx.max(0.0).hypot(dy.max(0.0)) + dx.max(dy).min(0.0) < 8.0;
-            if !inside {
-                continue;
-            }
-            let moon = ((fx - 30.0).hypot(fy - 32.0) < 17.0) && ((fx - 39.0).hypot(fy - 28.0) >= 14.0);
-            let c = if moon { [250, 232, 160, 255] } else { [74, 48, 140, 255] };
-            let i = (y * n + x) * 4;
-            rgba[i..i + 4].copy_from_slice(&c);
-        }
-    }
-    egui::IconData { rgba, width: n as u32, height: n as u32 }
+    egui::IconData { rgba: logo::icon_rgba(64), width: 64, height: 64 }
 }

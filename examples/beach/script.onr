@@ -1,0 +1,29 @@
+oneiro 0.1
+project "Beach Day"
+style default: cutout_2d
+
+use character Marta
+use character Blob
+use set beach
+
+# An open set: painted backdrops on four sides and animated sprites. Try other sides with `from east`, `from south`...
+scene 1 "A day at the beach" in beach {
+  time: day
+  place Marta at beach.start
+  place Blob at beach.towel facing beach.shore
+
+  camera wide from south move dolly_in for 4s
+  Marta walks_to beach.towel
+  Marta (happy): "What a perfect day!"
+  Blob (happy): "Look at the sea."
+
+  transition dissolve for 0.8s
+  camera wide from east
+  Marta walks_to beach.umbrella
+  wait 1s
+
+  transition wipe_left for 0.6s
+  camera medium on Blob
+  Blob looks_at beach.shore
+  wait 1s
+}

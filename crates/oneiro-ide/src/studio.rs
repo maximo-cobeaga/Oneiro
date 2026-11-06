@@ -1,6 +1,7 @@
 //! The Audio tab (sound studio): dialogue lines with record / import / generate, a sound library
 //! with generators and waveforms, a mini mix timeline, synchronized playback and voice settings.
 
+use crate::i18n::tr;
 use crate::app::{fmt_time, App, RightTab};
 use eframe::egui::{self, Color32, Pos2, Rect, RichText, Sense, Stroke};
 use oneiro_audio::device::{Player, Recorder};
@@ -40,12 +41,20 @@ pub struct Review {
     pub loud: f32,
 }
 
+/// What to do when automatic voice generation ends.
+#[derive(Clone, Debug)]
+pub enum AfterVoices {
+    Play,
+    Export(PathBuf, u32, u32, bool),
+}
+
 pub enum VoiceMsg {
     Progress { done: usize, total: usize, label: String },
     Script { res: Result<(String, Vec<LineReport>), String>, base: String },
     Line { res: Result<f64, String>, line: u32, rel: String, had_audio: bool, who: String },
     Voices(ProviderKind, Result<Vec<VoiceInfo>, String>),
     Clip(Result<Audio, String>),
+    Cloned { res: Result<String, String>, who: String },
 }
 
 pub struct VoiceJob {
@@ -78,6 +87,15 @@ pub struct AudioState {
     pub session_key: String,
     pub show_settings: bool,
     pub gen_provider: ProviderKind,
+    /// Use each character's own voice (its provider and voice id) instead of one provider for everybody.
+    pub own_voices: bool,
+    /// Generate missing voices by itself before playing or exporting.
+    pub auto_voices: bool,
+    pub after: Option<AfterVoices>,
+    pub clone_name: String,
+    pub clone_files: Vec<PathBuf>,
+    pub clone_for: String,
+    pub ctx: Option<egui::Context>,
     pub job: Option<VoiceJob>,
     pub reports: Vec<LineReport>,
     pub msg: String,
@@ -115,6 +133,13 @@ impl Default for AudioState {
             recording: None,
             review: None,
             gen_provider: cfg.default_provider,
+            own_voices: true,
+            auto_voices: true,
+            after: None,
+            clone_name: String::new(),
+            clone_files: vec![],
+            clone_for: String::new(),
+            ctx: None,
             cfg,
             session_key: String::new(),
             show_settings: false,
@@ -397,14 +422,14 @@ impl App {
         self.audio.job = Some(VoiceJob { rx, started: Instant::now(), done: 0, total: 1, label: label.into() });
     }
 
-    fn generate_all(&mut self, ctx: &egui::Context, force: bool) {
+    pub fn generate_all(&mut self, ctx: &egui::Context, force: bool, only: Vec<String>) {
         if self.audio.job.is_some() {
             return;
         }
         let Some(ws) = &self.ws else { return };
         let (root, project, base) = (ws.root.clone(), ws.project.clone(), ws.script_doc().text.clone());
         let cfg = self.audio.cfg.clone();
-        let opts = GenOptions { force, provider: Some(self.audio.gen_provider), only: vec![], session_key: Some(self.audio.session_key.clone()).filter(|k| !k.is_empty()) };
+        let opts = GenOptions { force, provider: if self.audio.own_voices { None } else { Some(self.audio.gen_provider) }, only, session_key: Some(self.audio.session_key.clone()).filter(|k| !k.is_empty()) };
         let (tx, rx) = channel();
         self.voice_job_spawn(rx, "starting...");
         let c2 = ctx.clone();
@@ -434,13 +459,13 @@ impl App {
             oneiro_voice::next_audio_path(&root, &who, &mut taken)
         });
         let cfg = self.audio.cfg.clone();
-        let force = self.audio.gen_provider;
+        let force = if self.audio.own_voices { None } else { Some(self.audio.gen_provider) };
         let key = Some(self.audio.session_key.clone()).filter(|k| !k.is_empty());
         let (tx, rx) = channel();
         self.voice_job_spawn(rx, &format!("{}: {}", who, short(&text, 40)));
         let c2 = ctx.clone();
         std::thread::spawn(move || {
-            let (kind, req) = oneiro_voice::request_for(&project, &cfg, &who, &emotion, &text, Some(force));
+            let (kind, req) = oneiro_voice::request_for(&project, &cfg, &who, &emotion, &text, force);
             let res = oneiro_voice::build(kind, &cfg, key.as_deref()).and_then(|p| oneiro_voice::synthesize_to(p.as_ref(), &req, &root.join(&rel)));
             let _ = tx.send(VoiceMsg::Line { res, line, rel, had_audio, who });
             c2.request_repaint();
@@ -562,12 +587,27 @@ impl App {
                     }
                     Err(e) => self.audio.msg = e,
                 },
+                VoiceMsg::Cloned { res, who } => match res {
+                    Err(e) => self.audio.msg = e,
+                    Ok(id) => {
+                        self.audio.msg = format!("Voice cloned (id {}).", id);
+                        if !who.is_empty() {
+                            match self.assign_voice(&who, &id) {
+                                Ok(()) => self.audio.msg = format!("Voice cloned and assigned to {}. Press Play to hear it (lines without audio are generated).", who),
+                                Err(e) => self.audio.msg = e,
+                            }
+                        }
+                    }
+                },
                 VoiceMsg::Clip(res) => match res {
                     Ok(a) => self.play_clip(&a),
                     Err(e) => self.audio.msg = e,
                 },
                 VoiceMsg::Progress { .. } => {}
             }
+        }
+        if self.audio.job.is_none() && self.audio.after.is_some() {
+            self.run_after_voices();
         }
     }
 
@@ -576,7 +616,7 @@ impl App {
     pub fn ui_audio(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let Some(root) = self.ws.as_ref().map(|w| w.root.clone()) else {
-            ui.label("No project open.");
+            ui.label(tr("No project open."));
             return;
         };
         self.poll_voice();
@@ -603,23 +643,23 @@ impl App {
                     ui.label(RichText::new(short(e, 60)).color(Color32::from_rgb(240, 120, 110)).small());
                 }
                 _ => {
-                    ui.label(RichText::new("Output opens on first playback").weak().small());
+                    ui.label(RichText::new(tr("Output opens on first playback")).weak().small());
                 }
             }
-            ui.checkbox(&mut self.audio.mute, "Mute");
+            ui.checkbox(&mut self.audio.mute, tr("Mute"));
             if self.audio.mics.is_empty() {
                 self.audio.mics = oneiro_audio::device::input_devices();
             }
             egui::ComboBox::from_id_salt("mic_choice").selected_text(format!("Mic: {}", short(self.audio.mic.as_deref().unwrap_or("system default"), 22))).width(190.0).show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.audio.mic, None, "system default");
+                ui.selectable_value(&mut self.audio.mic, None, tr("system default"));
                 for m in self.audio.mics.clone() {
                     ui.selectable_value(&mut self.audio.mic, Some(m.clone()), m);
                 }
-                if ui.small_button("Refresh list").clicked() {
+                if ui.small_button(tr("Refresh list")).clicked() {
                     self.audio.mics = oneiro_audio::device::input_devices();
                 }
             });
-            if ui.small_button("Voice settings...").clicked() {
+            if ui.small_button(tr("Voice settings...")).clicked() {
                 self.audio.show_settings = true;
             }
         });
@@ -656,13 +696,13 @@ impl App {
                 let peaks = dsp::waveform(&rv.audio, 120);
                 draw_wave(ui, &peaks, egui::vec2(ui.available_width().min(360.0), 36.0), VOICE_COL);
                 ui.horizontal(|ui| {
-                    if ui.button("Listen").clicked() {
+                    if ui.button(tr("Listen")).clicked() {
                         acts.push(Act::ListenReview);
                     }
-                    if ui.button(RichText::new("Keep").strong()).clicked() {
+                    if ui.button(RichText::new(tr("Keep")).strong()).clicked() {
                         acts.push(Act::KeepReview);
                     }
-                    if ui.button("Discard").clicked() {
+                    if ui.button(tr("Discard")).clicked() {
                         acts.push(Act::DiscardReview);
                     }
                 });
@@ -675,10 +715,10 @@ impl App {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(format!("REC {:.1}s", r.rec.seconds())).color(Color32::from_rgb(240, 90, 80)).strong());
                     level_bar(ui, r.rec.level(), 140.0);
-                    if ui.button(RichText::new("Stop").strong()).clicked() {
+                    if ui.button(RichText::new(tr("Stop")).strong()).clicked() {
                         acts.push(Act::StopMic);
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(tr("Cancel")).clicked() {
                         acts.push(Act::CancelRecording);
                     }
                 });
@@ -693,7 +733,7 @@ impl App {
         let busy = self.audio.job.is_some() || self.audio.recording.is_some();
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             // ================================================================ mix timeline
-            egui::CollapsingHeader::new(RichText::new("Mix timeline").strong()).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Mix timeline")).strong()).default_open(true).show(ui, |ui| {
                 let Some(ep) = self.ws.as_ref().map(|w| w.episode.clone()) else { return };
                 let dur = ep.duration.max(0.1);
                 let lanes = [("voice", VOICE_COL, AudioKind::Voice), ("sfx", SFX_COL, AudioKind::Sfx), ("music", MUSIC_COL, AudioKind::Music)];
@@ -731,8 +771,10 @@ impl App {
 
             // ================================================================ dialogue
             egui::CollapsingHeader::new(RichText::new(format!("Dialogue ({} lines)", lines.len())).strong()).default_open(true).show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Voices from");
+                ui.checkbox(&mut self.audio.auto_voices, tr("Generate missing voices automatically when I press Play or Render")).on_hover_text(tr("Uses the voice each character has in the Character builder (its provider and voice)."));
+                ui.checkbox(&mut self.audio.own_voices, tr("Use each character's own voice"));
+                ui.add_enabled_ui(!self.audio.own_voices, |ui| ui.horizontal(|ui| {
+                    ui.label(tr("Voices from"));
                     egui::ComboBox::from_id_salt("gen_provider").selected_text(self.audio.gen_provider.label()).width(210.0).show_ui(ui, |ui| {
                         for k in ProviderKind::ALL {
                             if k.synthesizes() {
@@ -740,18 +782,18 @@ impl App {
                             }
                         }
                     });
-                });
+                }));
                 let missing = lines.iter().filter(|l| l.audio.as_ref().map_or(true, |p| !root.join(p).exists())).count();
                 ui.horizontal(|ui| {
                     if ui.add_enabled(!busy && missing > 0, egui::Button::new(format!("Generate {} missing", missing))).clicked() {
                         acts.push(Act::GenerateAll { force: false });
                     }
-                    if ui.add_enabled(!busy && !lines.is_empty(), egui::Button::new("Regenerate all")).on_hover_text("Replaces every spoken line with a new synthesized take").clicked() {
+                    if ui.add_enabled(!busy && !lines.is_empty(), egui::Button::new(tr("Regenerate all"))).on_hover_text(tr("Replaces every spoken line with a new synthesized take")).clicked() {
                         acts.push(Act::GenerateAll { force: true });
                     }
                 });
                 if lines.is_empty() {
-                    ui.label(RichText::new("The script has no dialogue yet.").weak());
+                    ui.label(RichText::new(tr("The script has no dialogue yet.")).weak());
                 }
                 for l in &lines {
                     let rel = l.audio.clone();
@@ -766,10 +808,10 @@ impl App {
                                 ui.label(RichText::new(format!("{:.1}s  {:.0} dBFS", d, loud)).small().color(Color32::from_rgb(120, 220, 150)));
                             }
                             None if rel.is_some() => {
-                                ui.label(RichText::new("file missing").small().color(Color32::from_rgb(240, 120, 110)));
+                                ui.label(RichText::new(tr("file missing")).small().color(Color32::from_rgb(240, 120, 110)));
                             }
                             None => {
-                                ui.label(RichText::new("no audio (timing estimated)").small().color(Color32::from_rgb(240, 200, 80)));
+                                ui.label(RichText::new(tr("no audio (timing estimated)")).small().color(Color32::from_rgb(240, 200, 80)));
                             }
                         }
                     });
@@ -778,18 +820,18 @@ impl App {
                         draw_wave(ui, peaks, egui::vec2(ui.available_width().min(380.0), 22.0), VOICE_COL);
                     }
                     ui.horizontal(|ui| {
-                        if ui.add_enabled(info.is_some(), egui::Button::new("Play").small()).clicked() {
+                        if ui.add_enabled(info.is_some(), egui::Button::new(tr("Play")).small()).clicked() {
                             if let Some(p) = &path {
                                 acts.push(Act::Play(p.clone()));
                             }
                         }
-                        if ui.add_enabled(!busy, egui::Button::new("Record").small()).on_hover_text("Record this line with your microphone").clicked() {
+                        if ui.add_enabled(!busy, egui::Button::new(tr("Record")).small()).on_hover_text(tr("Record this line with your microphone")).clicked() {
                             acts.push(Act::RecordLine { who: l.who.clone(), line: l.line, rel: rel.clone() });
                         }
-                        if ui.add_enabled(!busy, egui::Button::new("Import...").small()).on_hover_text("Use an existing audio file (wav, mp3, ogg, flac, m4a...)").clicked() {
+                        if ui.add_enabled(!busy, egui::Button::new(tr("Import...")).small()).on_hover_text(tr("Use an existing audio file (wav, mp3, ogg, flac, m4a...)")).clicked() {
                             acts.push(Act::ImportLine { who: l.who.clone(), line: l.line, rel: rel.clone() });
                         }
-                        if ui.add_enabled(!busy, egui::Button::new("Generate").small()).on_hover_text("Synthesize this line with the chosen voice provider").clicked() {
+                        if ui.add_enabled(!busy, egui::Button::new(tr("Generate")).small()).on_hover_text(tr("Synthesize this line with the chosen voice provider")).clicked() {
                             acts.push(Act::GenerateLine { who: l.who.clone(), emotion: l.emotion.clone(), text: l.text.clone(), line: l.line, rel: rel.clone() });
                         }
                     });
@@ -800,7 +842,7 @@ impl App {
             });
 
             // ================================================================ library
-            egui::CollapsingHeader::new(RichText::new("Sounds and music").strong()).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Sounds and music")).strong()).default_open(true).show(ui, |ui| {
                 let mut sounds: Vec<(PathBuf, bool)> = vec![];
                 for (sub, is_music) in [("library/sounds", false), ("library/music", true)] {
                     if let Ok(rd) = std::fs::read_dir(root.join(sub)) {
@@ -810,13 +852,13 @@ impl App {
                     }
                 }
                 if sounds.is_empty() {
-                    ui.label(RichText::new("No sounds yet. Create some below.").weak());
+                    ui.label(RichText::new(tr("No sounds yet. Create some below.")).weak());
                 }
                 for (p, is_music) in &sounds {
                     let name = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
                     let info = self.audio.wave(p).map(|w| (w.dur, w.peaks.clone()));
                     ui.horizontal(|ui| {
-                        if ui.small_button("Play").clicked() {
+                        if ui.small_button(tr("Play")).clicked() {
                             acts.push(Act::Play(p.clone()));
                         }
                         ui.label(RichText::new(&name).strong());
@@ -825,7 +867,7 @@ impl App {
                             ui.label(RichText::new(format!("{:.1}s", d)).weak().small());
                             draw_wave(ui, peaks, egui::vec2(90.0, 16.0), if *is_music { MUSIC_COL } else { SFX_COL });
                         }
-                        if ui.small_button("Insert").on_hover_text("Insert it in the script at the cursor").clicked() {
+                        if ui.small_button(tr("Insert")).on_hover_text(tr("Insert it in the script at the cursor")).clicked() {
                             acts.push(Act::Insert(format!("{} {}", if *is_music { "music" } else { "sfx" }, name)));
                         }
                     });
@@ -833,7 +875,7 @@ impl App {
                 ui.separator();
 
                 // ---- sound effect generator
-                ui.label(RichText::new("Create a sound effect").strong());
+                ui.label(RichText::new(tr("Create a sound effect")).strong());
                 let presets = sfxgen::PRESETS;
                 ui.horizontal(|ui| {
                     egui::ComboBox::from_id_salt("sfx_preset").selected_text(format!("{} - {}", presets[self.audio.sfx_choice].0, presets[self.audio.sfx_choice].1)).width(230.0).show_ui(ui, |ui| {
@@ -841,18 +883,18 @@ impl App {
                             ui.selectable_value(&mut self.audio.sfx_choice, i, format!("{} - {}", n, d));
                         }
                     });
-                    ui.label("variation");
+                    ui.label(tr("variation"));
                     ui.add(egui::DragValue::new(&mut self.audio.sfx_seed).range(1..=9999));
                 });
                 ui.horizontal(|ui| {
-                    ui.label("name");
+                    ui.label(tr("name"));
                     ui.add(egui::TextEdit::singleline(&mut self.audio.sfx_name).hint_text(presets[self.audio.sfx_choice].0).desired_width(120.0));
-                    if ui.button("Preview").clicked() {
+                    if ui.button(tr("Preview")).clicked() {
                         if let Some(a) = sfxgen::generate(presets[self.audio.sfx_choice].0, self.audio.sfx_seed) {
                             self.play_clip(&a);
                         }
                     }
-                    if ui.button("Add to library").clicked() {
+                    if ui.button(tr("Add to library")).clicked() {
                         let preset = presets[self.audio.sfx_choice].0;
                         let name = if self.audio.sfx_name.trim().is_empty() { preset.to_string() } else { safe_name(&self.audio.sfx_name) };
                         if let Some(a) = sfxgen::generate(preset, self.audio.sfx_seed) {
@@ -870,7 +912,7 @@ impl App {
                 ui.add_space(4.0);
 
                 // ---- music generator
-                ui.label(RichText::new("Create background music").strong());
+                ui.label(RichText::new(tr("Create background music")).strong());
                 ui.horizontal(|ui| {
                     egui::ComboBox::from_id_salt("music_mood").selected_text(self.audio.mood.id()).width(90.0).show_ui(ui, |ui| {
                         for m in Mood::ALL {
@@ -879,22 +921,22 @@ impl App {
                             }
                         }
                     });
-                    ui.label("bpm");
+                    ui.label(tr("bpm"));
                     ui.add(egui::DragValue::new(&mut self.audio.bpm).range(40.0..=200.0).speed(0.5));
-                    ui.label("bars");
+                    ui.label(tr("bars"));
                     ui.add(egui::DragValue::new(&mut self.audio.bars).range(1..=32));
-                    ui.label("seed");
+                    ui.label(tr("seed"));
                     ui.add(egui::DragValue::new(&mut self.audio.music_seed).range(1..=9999));
                 });
                 ui.horizontal(|ui| {
-                    ui.label("name");
+                    ui.label(tr("name"));
                     ui.add(egui::TextEdit::singleline(&mut self.audio.music_name).hint_text(self.audio.mood.id()).desired_width(120.0));
                     let spec = MusicSpec { mood: self.audio.mood, bpm: self.audio.bpm, bars: self.audio.bars, seed: self.audio.music_seed, key: 0 };
-                    if ui.button("Preview").clicked() {
+                    if ui.button(tr("Preview")).clicked() {
                         let a = musicgen::generate(&spec);
                         self.play_clip(&a);
                     }
-                    if ui.button("Add to library").clicked() {
+                    if ui.button(tr("Add to library")).clicked() {
                         let name = if self.audio.music_name.trim().is_empty() { format!("{}_{}", spec.mood.id(), spec.seed) } else { safe_name(&self.audio.music_name) };
                         let a = musicgen::generate(&spec);
                         let path = root.join("library").join("music").join(format!("{}.wav", name));
@@ -910,10 +952,10 @@ impl App {
                 ui.add_space(4.0);
 
                 // ---- import / record
-                ui.label(RichText::new("Import or record").strong());
+                ui.label(RichText::new(tr("Import or record")).strong());
                 ui.horizontal(|ui| {
-                    ui.checkbox(&mut self.audio.import_music, "it is music");
-                    if ui.button("Import file...").clicked() {
+                    ui.checkbox(&mut self.audio.import_music, tr("it is music"));
+                    if ui.button(tr("Import file...")).clicked() {
                         if let Some(f) = rfd::FileDialog::new().set_title("Import audio").add_filter("Audio", &["wav", "mp3", "ogg", "flac", "m4a", "aac", "opus", "wma"]).pick_file() {
                             let stem = f.file_stem().map(|s| safe_name(&s.to_string_lossy())).unwrap_or_else(|| "imported".into());
                             let (kind, folder) = if self.audio.import_music { (ImportKind::Music, "library/music") } else { (ImportKind::Sfx, "library/sounds") };
@@ -928,10 +970,10 @@ impl App {
                     }
                 });
                 ui.horizontal(|ui| {
-                    ui.label("record a sound named");
-                    ui.add(egui::TextEdit::singleline(&mut self.audio.rec_name).hint_text("my_sound").desired_width(110.0));
+                    ui.label(tr("record a sound named"));
+                    ui.add(egui::TextEdit::singleline(&mut self.audio.rec_name).hint_text(tr("my_sound")).desired_width(110.0));
                     let ok = !safe_name(&self.audio.rec_name).is_empty();
-                    if ui.add_enabled(!busy && ok, egui::Button::new("Record")).clicked() {
+                    if ui.add_enabled(!busy && ok, egui::Button::new(tr("Record"))).clicked() {
                         let name = safe_name(&self.audio.rec_name);
                         acts.push(Act::RecordLine { who: String::new(), line: 0, rel: Some(format!("sound:{}", name)) });
                     }
@@ -971,7 +1013,7 @@ impl App {
                     }
                 }
                 Act::GenerateLine { who, emotion, text, line, rel } => self.generate_line(&ctx, who, emotion, text, line, rel),
-                Act::GenerateAll { force } => self.generate_all(&ctx, force),
+                Act::GenerateAll { force } => self.generate_all(&ctx, force, vec![]),
                 Act::StopMic => self.stop_mic(),
                 Act::CancelRecording => {
                     self.audio.recording = None;
@@ -1007,7 +1049,7 @@ impl App {
         if let Some(name) = self.startup.demo_generate.clone() {
             if f == 5 {
                 self.audio.gen_provider = ProviderKind::from_id(&name).unwrap_or(ProviderKind::Demo);
-                self.generate_all(ctx, false);
+                self.generate_all(ctx, false, vec![]);
             }
             if f > 5 && self.audio.job.is_none() {
                 let missing = oneiro_voice::dialogues(&self.ws.as_ref().map(|w| w.script_doc().text.clone()).unwrap_or_default()).iter().filter(|l| l.audio.is_none()).count();
@@ -1043,11 +1085,12 @@ impl App {
         }
         let mut open = true;
         let mut list: Option<ProviderKind> = None;
+        let mut clone = false;
         let mut save = false;
-        egui::Window::new("Voice settings").open(&mut open).default_width(430.0).show(ctx, |ui| {
-            ui.label(RichText::new("API keys are never saved to disk: only the name of the environment variable is stored.").weak().small());
+        egui::Window::new(tr("Voice settings")).open(&mut open).default_width(430.0).show(ctx, |ui| {
+            ui.label(RichText::new(tr("API keys are never saved to disk: only the name of the environment variable is stored.")).weak().small());
             ui.horizontal(|ui| {
-                ui.label("Default engine");
+                ui.label(tr("Default engine"));
                 egui::ComboBox::from_id_salt("default_provider").selected_text(self.audio.cfg.default_provider.label()).show_ui(ui, |ui| {
                     for k in ProviderKind::ALL {
                         ui.selectable_value(&mut self.audio.cfg.default_provider, k, k.label());
@@ -1056,48 +1099,73 @@ impl App {
             });
             ui.label(RichText::new("Characters set their own engine and voice in the Character builder (voice section) or in `voice { provider: elevenlabs, voice: \"id\" }`.").weak().small());
             ui.separator();
-            ui.label(RichText::new("Windows speech (offline)").strong());
+            ui.label(RichText::new(tr("Windows speech (offline)")).strong());
             ui.horizontal(|ui| {
-                ui.label("default voice");
-                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.sapi_voice).hint_text("system default").desired_width(220.0));
-                if ui.button("List voices").clicked() {
+                ui.label(tr("default voice"));
+                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.sapi_voice).hint_text(tr("system default")).desired_width(220.0));
+                if ui.button(tr("List voices")).clicked() {
                     list = Some(ProviderKind::Sapi);
                 }
             });
             ui.separator();
-            ui.label(RichText::new("ElevenLabs").strong());
+            ui.label(RichText::new(tr("ElevenLabs")).strong());
             egui::Grid::new("el_grid").num_columns(2).show(ui, |ui| {
-                ui.label("key variable");
-                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.elevenlabs_key_env).hint_text("ELEVENLABS_API_KEY"));
+                ui.label(tr("key variable"));
+                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.elevenlabs_key_env).hint_text(tr("ELEVENLABS_API_KEY")));
                 ui.end_row();
-                ui.label("key (this session)");
+                ui.label(tr("key (this session)"));
                 ui.add(egui::TextEdit::singleline(&mut self.audio.session_key).password(true));
                 ui.end_row();
-                ui.label("model");
+                ui.label(tr("model"));
                 ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.elevenlabs_model));
                 ui.end_row();
             });
-            if ui.button("List my ElevenLabs voices").clicked() {
+            if ui.button(tr("List my ElevenLabs voices")).clicked() {
                 list = Some(ProviderKind::ElevenLabs);
             }
+            ui.collapsing(tr("Clone a voice (ElevenLabs)"), |ui| {
+                ui.label(RichText::new(tr("Upload clean recordings of ONE person who agreed to it (about a minute or more; WAV, MP3...). Needs an ElevenLabs plan with voice cloning.")).weak().small());
+                ui.horizontal(|ui| {
+                    ui.label(tr("name"));
+                    ui.add(egui::TextEdit::singleline(&mut self.audio.clone_name).desired_width(160.0));
+                });
+                ui.horizontal(|ui| {
+                    if ui.button(tr("Choose recordings...")).clicked() {
+                        if let Some(p) = rfd::FileDialog::new().set_title("Recordings of the voice").add_filter("audio", &["wav", "mp3", "m4a", "ogg", "flac"]).pick_files() {
+                            self.audio.clone_files = p;
+                        }
+                    }
+                    ui.label(format!("{} file(s)", self.audio.clone_files.len()));
+                });
+                let who: Vec<String> = self.ws.as_ref().map(|w| w.project.characters.keys().cloned().collect()).unwrap_or_default();
+                egui::ComboBox::from_id_salt("clone_for").selected_text(if self.audio.clone_for.is_empty() { "(only create the voice)".to_string() } else { self.audio.clone_for.clone() }).show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.audio.clone_for, String::new(), "(only create the voice)");
+                    for n in &who {
+                        ui.selectable_value(&mut self.audio.clone_for, n.clone(), format!("use it for {}", n));
+                    }
+                });
+                if ui.add_enabled(self.audio.job.is_none() && !self.audio.clone_files.is_empty() && !self.audio.clone_name.trim().is_empty(), egui::Button::new(tr("Clone voice"))).clicked() {
+                    clone = true;
+                }
+            });
             ui.separator();
-            ui.label(RichText::new("OpenAI-compatible TTS / local server").strong());
+            ui.label(RichText::new(tr("OpenAI-compatible TTS / local server")).strong());
             egui::Grid::new("oa_grid").num_columns(2).show(ui, |ui| {
-                ui.label("base URL");
-                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.openai_base_url).hint_text("http://localhost:8880/v1"));
+                ui.label(tr("base URL"));
+                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.openai_base_url).hint_text(tr("http://localhost:8880/v1")));
                 ui.end_row();
-                ui.label("model");
+                ui.label(tr("model"));
                 ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.openai_model));
                 ui.end_row();
-                ui.label("default voice");
+                ui.label(tr("default voice"));
                 ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.openai_voice));
                 ui.end_row();
-                ui.label("key variable");
-                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.openai_key_env).hint_text("(none for local servers)"));
+                ui.label(tr("key variable"));
+                ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.openai_key_env).hint_text(tr("(none for local servers)")));
                 ui.end_row();
             });
             ui.separator();
-            ui.label(RichText::new("Custom command (Piper, espeak-ng...)").strong());
+            ui.label(RichText::new(tr("Custom command (Piper, espeak-ng...)")).strong());
             ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.command).hint_text("piper --model voice.onnx --output_file {out}").desired_width(f32::INFINITY));
             ui.label(RichText::new("Placeholders: {text} {out} {voice} {speed}. Without {text} the line is sent on stdin.").weak().small());
             ui.separator();
@@ -1106,7 +1174,7 @@ impl App {
                 egui::ScrollArea::vertical().max_height(140.0).show(ui, |ui| {
                     for v in &self.audio.voices {
                         ui.horizontal(|ui| {
-                            if ui.small_button("Copy id").clicked() {
+                            if ui.small_button(tr("Copy id")).clicked() {
                                 ui.ctx().copy_text(v.id.clone());
                             }
                             ui.label(RichText::new(&v.name).strong());
@@ -1116,13 +1184,16 @@ impl App {
                 });
                 ui.separator();
             }
-            if ui.button(RichText::new("Save settings").strong()).clicked() {
+            if ui.button(RichText::new(tr("Save settings")).strong()).clicked() {
                 save = true;
             }
         });
         if let Some(k) = list {
             let ctx2 = ctx.clone();
             self.list_voices(&ctx2, k);
+        }
+        if clone {
+            self.start_clone(ctx);
         }
         if save {
             match self.audio.cfg.save() {
@@ -1131,5 +1202,83 @@ impl App {
             }
         }
         self.audio.show_settings = open;
+    }
+}
+
+impl App {
+    /// Characters that have lines without audio and a real voice configured (not `file`).
+    pub fn auto_voice_targets(&self) -> Vec<String> {
+        let Some(ws) = &self.ws else { return vec![] };
+        let mut out: Vec<String> = vec![];
+        for l in oneiro_voice::dialogues(&ws.script_doc().text) {
+            if l.audio.as_ref().map_or(false, |p| ws.root.join(p).exists()) {
+                continue;
+            }
+            let real = ws.project.characters.get(&l.who).and_then(|c| ProviderKind::from_id(&c.voice_provider)).map_or(false, |k| k != ProviderKind::File && k.synthesizes());
+            if real && !out.contains(&l.who) {
+                out.push(l.who);
+            }
+        }
+        out
+    }
+
+    /// If automatic voices are on and some lines have a voice to generate, starts that and remembers what
+    /// to do afterwards. Returns true when the caller must wait.
+    pub fn ensure_voices(&mut self, after: AfterVoices) -> bool {
+        if !self.audio.auto_voices || self.audio.job.is_some() {
+            return false;
+        }
+        let who = self.auto_voice_targets();
+        let Some(ctx) = self.audio.ctx.clone() else { return false };
+        if who.is_empty() {
+            return false;
+        }
+        self.status = format!("Generating the voices of {}...", who.join(", "));
+        self.audio.after = Some(after);
+        self.generate_all(&ctx, false, who);
+        if self.audio.job.is_none() {
+            self.audio.after = None;
+            return false;
+        }
+        true
+    }
+
+    /// Runs what was waiting for the voices.
+    pub fn run_after_voices(&mut self) {
+        let prev = self.audio.auto_voices;
+        self.audio.auto_voices = false; // no second round if some line could not be generated
+        match self.audio.after.take() {
+            Some(AfterVoices::Play) => self.toggle_play(),
+            Some(AfterVoices::Export(out, w, h, preview)) => self.start_export(out, w, h, preview),
+            None => {}
+        }
+        self.audio.auto_voices = prev;
+    }
+}
+
+impl App {
+    fn start_clone(&mut self, ctx: &egui::Context) {
+        let (cfg, name, files, who) = (self.audio.cfg.clone(), self.audio.clone_name.clone(), self.audio.clone_files.clone(), self.audio.clone_for.clone());
+        let key = Some(self.audio.session_key.clone()).filter(|k| !k.is_empty());
+        let (tx, rx) = channel();
+        self.voice_job_spawn(rx, "cloning the voice...");
+        let c2 = ctx.clone();
+        std::thread::spawn(move || {
+            let res = oneiro_voice::providers::clone_voice(&cfg, key.as_deref(), &name, &files);
+            let _ = tx.send(VoiceMsg::Cloned { res, who });
+            c2.request_repaint();
+        });
+    }
+
+    /// Gives a character the ElevenLabs voice `id` (rewrites its .onchar).
+    fn assign_voice(&mut self, who: &str, id: &str) -> Result<(), String> {
+        let ws = self.ws.as_mut().ok_or("no project open")?;
+        let mut def = ws.project.characters.get(who).cloned().ok_or_else(|| format!("no character called {}", who))?;
+        def.voice_provider = "elevenlabs".into();
+        def.voice_id = id.to_string();
+        let path = ws.root.join("library").join("characters").join(format!("{}.onchar", who));
+        std::fs::write(&path, def.to_source()).map_err(|e| format!("{}: {}", path.display(), e))?;
+        ws.reload_project();
+        Ok(())
     }
 }

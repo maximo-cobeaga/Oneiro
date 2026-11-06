@@ -25,6 +25,11 @@ pub fn plain_set() -> SetDef {
         floor_alt: Rgb(188, 192, 206),
         trim: Rgb(150, 156, 178),
         look: "flat".into(),
+        open: false,
+        sky: (Rgb(120, 190, 240), Rgb(255, 244, 214)),
+        ground: Rgb(226, 208, 150),
+        backdrops: Default::default(),
+        sprites: vec![],
     }
 }
 

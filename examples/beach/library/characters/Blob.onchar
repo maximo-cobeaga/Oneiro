@@ -1,0 +1,20 @@
+# Blob: the cheerful, easily flustered diner cook.
+character Blob {
+  rig: library.rigs.biped_cutout
+  build {
+    head:  library.heads.round    { size: 1.0, skin_tone: #8FD694, bald: 1 }
+    eyes:  library.eyes.wide      { spacing: 0.42 }
+    mouth: library.mouths.visemes_basic
+    body:  library.bodies.round   { height: 1.15 }
+  }
+  wardrobe {
+    default: [chef_hat, apron_white, gray_pants, black_shoes]
+  }
+  voice { provider: file, pitch: 118 }
+  sheet {
+    age: 40
+    traits: [nervous, kind]
+    notes: "Always forgets orders."
+  }
+  styles { cutout_2d: auto }
+}
