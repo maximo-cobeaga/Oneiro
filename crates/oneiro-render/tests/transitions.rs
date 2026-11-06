@@ -49,3 +49,36 @@ fn shadows_follow_the_time_of_day() {
     assert!(l(k) > l(d) && l(d) > l(n), "dusk shadows are longest, night shortest");
     assert!(d[0] > 0.0 && k[0] < 0.0, "the sun moves from one side to the other");
 }
+
+fn diner_with(look: &str) -> (Project, String) {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/first_short").canonicalize().unwrap();
+    let mut d = vec![];
+    let mut p = Project::load(&root, &mut d);
+    let set = p.sets.get_mut("diner").unwrap();
+    set.look = look.to_string();
+    (p, "oneiro 0.1\nproject \"t\"\nuse character Marta\nuse set diner\nscene 1 \"s\" in diner {\n  place Marta at diner.stool_2\n  camera wide\n  wait 1s\n}\n".into())
+}
+
+#[test]
+fn three_d_props_draw_differently_and_reproducibly() {
+    let draw = |look: &str| {
+        let (p, text) = diner_with(look);
+        let (e, d) = compile_source(&p, "t.onr", &text, &Lock::default());
+        assert!(d.iter().all(|x| !x.is_error()));
+        Renderer::new(&e, 320, 180).render_at(0.5)
+    };
+    let (flat, solid) = (draw("flat"), draw("toon_3d"));
+    assert_ne!(flat.data(), solid.data());
+    assert_eq!(solid.data(), draw("toon_3d").data());
+    let diff = flat.data().chunks(4).zip(solid.data().chunks(4)).filter(|(a, b)| a != b).count();
+    assert!(diff > 500, "the 3D props must visibly differ: {} px", diff);
+}
+
+#[test]
+fn a_bad_look_is_reported() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/first_short").canonicalize().unwrap();
+    let set = std::fs::read_to_string(root.join("library/sets/diner.onset")).unwrap().replace("height: 3m", "height: 3m\n  look: plastic");
+    let (file, mut d) = oneiro_lang::parse(&set, "diner.onset");
+    let _ = oneiro_core::SetDef::from_block(&file.blocks[0], "diner.onset", &mut d);
+    assert!(d.iter().any(|x| x.code == "E1120"), "{:?}", d.iter().map(|x| x.render()).collect::<Vec<_>>());
+}

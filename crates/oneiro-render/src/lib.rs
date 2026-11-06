@@ -136,6 +136,11 @@ impl<'a> Renderer<'a> {
             match item {
                 Item::Piece { prop, piece } => {
                     p.tf = Transform::identity();
+                    let pr = &sc.set.props[prop];
+                    if sc.set.prop_is_3d(pr) && oneiro_toon3d::props::supported(pr) {
+                        draw_prop3d(&mut *p.pm, &sc.set, prop, piece, tint, px, &cam);
+                        continue;
+                    }
                     set::draw_piece(&mut p, &cam, &sc.set, prop, piece, px);
                 }
                 Item::Actor(i) => {
@@ -323,4 +328,34 @@ pub fn light_dir(time_of_day: &str) -> [f64; 2] {
         "dusk" => [-0.95, -0.3],
         _ => [0.55, -0.2],
     }
+}
+
+/// A prop drawn as a real 3D mesh (`look: toon_3d`): the mesh's screen bounds become a transparent layer.
+fn draw_prop3d(pm: &mut Pixmap, set: &oneiro_core::SetDef, prop: usize, piece: usize, tint: [f64; 3], px: f32, cam: &Cam) {
+    let mesh = oneiro_toon3d::props::prop_mesh(set, &set.props[prop], piece);
+    if mesh.is_empty() {
+        return;
+    }
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for v in &mesh.v {
+        let c = cam.to_cam([v.p[0] as f64, v.p[1] as f64, v.p[2] as f64]);
+        if c[2] < 0.2 {
+            return;
+        }
+        let (sx, sy) = cam.project_cam(c);
+        x0 = x0.min(sx as f64);
+        y0 = y0.min(sy as f64);
+        x1 = x1.max(sx as f64);
+        y1 = y1.max(sy as f64);
+    }
+    let pad = 6.0 * px as f64 + 4.0;
+    let (x0, y0) = (((x0 - pad).floor() as i64).max(0), ((y0 - pad).floor() as i64).max(0));
+    let (x1, y1) = (((x1 + pad).ceil() as i64).min(pm.width() as i64), ((y1 + pad).ceil() as i64).min(pm.height() as i64));
+    if x1 - x0 < 2 || y1 - y0 < 2 {
+        return;
+    }
+    let local = oneiro_toon3d::Camera { pos: cam.pos, right: cam.right, up: cam.up, fwd: cam.fwd, f: cam.f, cx: cam.cx - x0 as f64, cy: cam.cy - y0 as f64 };
+    let style = oneiro_toon3d::Style { tint: [tint[0] as f32, tint[1] as f32, tint[2] as f32], outline_px: 2.2 * px };
+    let layer = oneiro_toon3d::render_mesh(&mesh, &local, (x1 - x0) as u32, (y1 - y0) as u32, &style, oneiro_toon3d::Backend::Auto);
+    pm.draw_pixmap(x0 as i32, y0 as i32, layer.as_ref(), &tiny_skia::PixmapPaint::default(), Transform::identity(), None);
 }

@@ -244,10 +244,10 @@ pub fn prop_pieces(set: &SetDef, cam: &Cam) -> Vec<PieceRef> {
         if pr.wall.is_some() {
             continue;
         }
-        let n = if pr.kind == "counter" { counter_pieces(pr) } else { 1 };
+        let n = if pr.kind == "counter" && !set.prop_is_3d(pr) { counter_pieces(pr) } else { 1 };
         let bias = if pr.kind == "pie_case" { -0.45 } else { 0.0 };
         for k in 0..n {
-            let c = cam.to_cam(piece_center(pr, k));
+            let c = if n == 1 && pr.kind == "counter" { cam.to_cam([pr.at[0], 0.5, pr.at[1]]) } else { cam.to_cam(piece_center(pr, k)) };
             out.push(PieceRef { depth: c[2] + bias, prop: i, piece: k });
         }
     }

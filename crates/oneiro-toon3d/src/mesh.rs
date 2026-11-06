@@ -231,6 +231,35 @@ impl Mesh {
         self.revolve(base, top, &prof, color);
     }
 
+    /// A box standing on the floor plane at `y0`: `c` is the (x, z) center, `size` the (width, height, depth)
+    /// along the right axis, up and forward axis of a `yaw`-rotated frame. Faces are flat-shaded.
+    pub fn cuboid(&mut self, c: [f32; 2], y0: f32, size: [f32; 3], yaw: f32, color: V3) {
+        let r = [yaw.cos(), 0.0, -yaw.sin()];
+        let f = [yaw.sin(), 0.0, yaw.cos()];
+        let u = [0.0, 1.0, 0.0];
+        let o = [c[0], y0 + size[1] / 2.0, c[1]];
+        let (hx, hy, hz) = (size[0] / 2.0, size[1] / 2.0, size[2] / 2.0);
+        let axes = [(r, hx, u, hy, f, hz), (u, hy, f, hz, r, hx), (f, hz, r, hx, u, hy)];
+        for (a, ha, b, hb, n, hn) in axes {
+            for s in [1.0f32, -1.0] {
+                let nrm = mul(n, s);
+                let ctr = add(o, mul(n, hn * s));
+                let q = |i: f32, j: f32| add(ctr, add(mul(a, ha * i), mul(b, hb * j)));
+                let pts = [q(-1.0, -1.0), q(1.0, -1.0), q(1.0, 1.0), q(-1.0, 1.0)];
+                let base = self.v.len() as u32;
+                for p in pts {
+                    self.v.push(Vtx { p, n: nrm, c: color });
+                }
+                let geo = cross(sub(pts[1], pts[0]), sub(pts[2], pts[0]));
+                if dot(geo, nrm) >= 0.0 {
+                    self.i.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+                } else {
+                    self.i.extend_from_slice(&[base, base + 2, base + 1, base, base + 3, base + 2]);
+                }
+            }
+        }
+    }
+
     /// A thin double-sided sheet through a `rows x cols` grid of points (cloth). `thickness` pushes the two
     /// faces apart so that the outline pass has a hull to grow.
     pub fn sheet(&mut self, pts: &[V3], rows: usize, cols: usize, thickness: f32, color: V3) {
