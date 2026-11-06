@@ -111,7 +111,7 @@ pub fn validate_parts(source: &str, svgs: &BTreeMap<String, String>) -> Result<(
             .iter()
             .map(|n| {
                 let (h, p) = default_part(n);
-                (n.to_string(), SvgPart { file: String::new(), height: h, pivot: p, doc: None })
+                (n.to_string(), SvgPart { file: String::new(), height: h, pivot: p, doc: None, raster: None })
             })
             .collect();
         def.svg = Some(SvgRig { parts, face: true, face_x: 0.5, face_y: 0.55, face_scale: 1.0 });

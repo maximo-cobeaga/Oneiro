@@ -10,6 +10,7 @@ members = [
     "crates/oneiro-ai",
     "crates/oneiro-mcp",
     "crates/oneiro-voice",
+    "crates/oneiro-cutter",
 ]
 
 [workspace.package]

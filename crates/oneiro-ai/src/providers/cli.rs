@@ -157,7 +157,7 @@ impl Provider for AgentCli {
     }
 
     fn supports_images(&self) -> bool {
-        self.kind == CliKind::Codex
+        matches!(self.kind, CliKind::Codex | CliKind::Claude)
     }
 
     fn complete(&self, req: &ChatRequest) -> Result<ChatResponse, String> {
@@ -166,15 +166,38 @@ impl Provider for AgentCli {
         let timeout = Duration::from_secs(self.timeout_secs);
         match self.kind {
             CliKind::Claude => {
-                let mut args: Vec<String> =
-                    ["-p", "--output-format", "text", "--no-session-persistence", "--disable-slash-commands", "--tools", ""].iter().map(|s| s.to_string()).collect();
+                // Claude Code reads images with its Read tool. With pictures in the request only that one tool is
+                // enabled (in the scratch folder); otherwise every tool stays off.
+                let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+                let mut image_files: Vec<PathBuf> = Vec::new();
+                for (i, png) in req.messages.iter().flat_map(|m| m.images.iter()).enumerate() {
+                    let p = workdir.join(format!("claude_img_{}_{}.png", stamp, i));
+                    if std::fs::write(&p, png).is_ok() {
+                        image_files.push(p);
+                    }
+                }
+                let mut prompt = prompt;
+                let mut args: Vec<String> = ["-p", "--output-format", "text", "--no-session-persistence", "--disable-slash-commands"].iter().map(|s| s.to_string()).collect();
+                if image_files.is_empty() {
+                    args.extend(["--tools".to_string(), String::new()]);
+                } else {
+                    args.extend(["--tools".to_string(), "Read".to_string(), "--allowedTools".to_string(), "Read".to_string()]);
+                    prompt.push_str("\n\n# Pictures\nLook at these image files with the Read tool before answering (oldest first):\n");
+                    for p in &image_files {
+                        prompt.push_str(&format!("- {}\n", p.display()));
+                    }
+                    prompt.push_str("Then reply exactly as requested, with no commentary about reading the files.\n");
+                }
                 if let Some(m) = &self.model {
                     args.push("--model".into());
                     args.push(m.clone());
                 }
                 args.extend(self.extra_args.iter().cloned());
-                let out = run_process(&self.command, &args, &self.env, &prompt, &workdir, timeout)?;
-                finish(out, &self.command)
+                let out = run_process(&self.command, &args, &self.env, &prompt, &workdir, timeout);
+                for p in &image_files {
+                    let _ = std::fs::remove_file(p);
+                }
+                finish(out?, &self.command)
             }
             CliKind::Codex => {
                 let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);

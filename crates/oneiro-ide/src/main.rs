@@ -3,6 +3,7 @@
 mod ai;
 mod app;
 mod builder;
+mod cutter;
 mod editor;
 mod highlight;
 mod inspector;
@@ -44,6 +45,7 @@ fn parse_args() -> StartupOpts {
             "--ai-request" => o.ai_request = Some(val()),
             "--ai-apply" => o.ai_apply = true,
             "--audio-selftest" => o.audio_selftest = true,
+            "--cut-image" => o.cut_image = Some(PathBuf::from(val())),
             "--demo-generate" => o.demo_generate = Some(val()),
             "--size" => {
                 let v = val();

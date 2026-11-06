@@ -68,7 +68,7 @@ render preview frame, return screenshot), so the AI can see its own output and s
 |---|---|---|
 | A. Block builder | MVP | Assemble parts from libraries with parameters; AI picks and tunes |
 | B. AI-authored vector parts | **Done (Phase 5)** | AI writes four SVG parts; the engine validates them (viewBox, pivots, safe subset) and rigs them into a puppet with a procedural lip-synced face. See 08-styles.md |
-| C. Hybrid cutter | later | See below |
+| C. Hybrid cutter | **Done (Phase 6)** | From an illustration to a rigged character, with human and AI validation. See 09-cutter.md |
 
 ### C — Hybrid cutter (design)
 

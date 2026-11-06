@@ -9,6 +9,7 @@ All files use the same Oneiro syntax; the extension tells tooling what to expect
 | `.onset` | Set (environment) |
 | `.onlock` | Resolved layout (generated; edit values and add `pinned: true` to keep them) |
 | `.svg` (in `library/parts/<Name>/`) | Vector parts of a tier-B character (safe SVG subset, see 08-styles.md) |
+| `.png` (in `library/parts/<Name>/`) | Raster parts cut from an illustration by the hybrid cutter (see 09-cutter.md) |
 | `.onstyle`, `.onclip` | Planned (custom styles, reusable animation clips) |
 
 ## 1. Project layout

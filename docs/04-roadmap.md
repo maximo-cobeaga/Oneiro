@@ -8,7 +8,7 @@
 | 3 | **AI integration** | **Done** - see docs/06-ai.md |
 | 4 | Audio studio | **Done** - see docs/07-audio.md and results below |
 | 5 | Style expansion | **Done** - see docs/08-styles.md and results below |
-| 6 | Hybrid cutter (tier C) | Assisted segmentation + validator in IDE |
+| 6 | Hybrid cutter (tier C) | **Done** - see docs/09-cutter.md and results below |
 | 7 | toon3d | wgpu 3D toon renderer; then physics and cloth for 3D only |
 
 ## Phase 1 acceptance results
@@ -127,3 +127,26 @@ many cores (single-thread 1080p clay is well below real time; the preview resolu
 
 Known limitations: the diner is drawn identically in every style; vector characters have rigid arms and rotate (not fold) their legs when
 sitting; `clay` in the IDE viewport is shaded but not "on twos" while dragging; no user-defined styles (`.onstyle`) yet.
+
+
+## Phase 6 results (hybrid cutter)
+
+| Goal | Result |
+|---|---|
+| Background removal | Learned from the image border and flood-filled, or the PNG's own alpha; keeps a floating head; explains failures |
+| Layout proposal | Heuristic (neck, hips, torso, symmetry axis from the head) and a vision-model loop with the engine's validator and a numbered-box picture |
+| Validator | 8 checks (`E1130`-`E1137`) in plain language: boxes, order, side, coverage, cut-off, proportions, body between the arms |
+| Cut and rig | PNG pieces with pivots and relative heights, mirrored right arm and leg, written as a normal `.onchar` (raster `parts`); works with every style and night tint |
+| IDE | Cutter tab: open, propose (automatic or AI), drag boxes, live checker, assembled-puppet preview, create |
+| CLI / MCP | `oneiro cut`; tools `propose_cut` and `cut_character` |
+| Providers | `claude-cli` can now see images (Read tool only, scratch folder) |
+
+Tests: 157 automated tests across the workspace; the cutter has 12 tests (masks, proposals, validator,
+JSON, overlay, jpeg via ffmpeg, end-to-end cut -> load -> render, names), the AI loop and MCP tools 3, and the IDE drag maths 2.
+Verified for real: a fox drawn by Claude (cut by the heuristic, and by Claude's own vision in two rounds), the IDE tab, stills.
+
+**Not verified:** photographs or painted/shaded illustrations (only flat-color cartoons were tried), characters not seen from the
+front, Codex or Anthropic API vision for this flow (same code path, not run), and big batches of illustrations.
+
+Known limitations: front-facing symmetric characters only; no inpainting of hidden areas; tails and accessories are not parts;
+the illustration's face does not lip-sync; rigid limbs.

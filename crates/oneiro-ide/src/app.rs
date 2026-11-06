@@ -2,6 +2,7 @@
 
 use crate::ai::AiState;
 use crate::builder::BuilderState;
+use crate::cutter::CutterState;
 use crate::record::Recorder;
 use crate::studio::AudioState;
 use crate::timeline::TimelineView;
@@ -21,6 +22,7 @@ pub enum RightTab {
     Character,
     Inspector,
     Audio,
+    Cutter,
     Ai,
 }
 
@@ -63,6 +65,8 @@ pub struct StartupOpts {
     pub audio_selftest: bool,
     /// Generates the missing voices with this provider, prints the result and exits.
     pub demo_generate: Option<String>,
+    /// Opens this illustration in the Cutter tab at startup (screenshots and tests).
+    pub cut_image: Option<PathBuf>,
 }
 
 pub struct App {
@@ -84,6 +88,7 @@ pub struct App {
     pub builder: BuilderState,
     pub ai: AiState,
     pub audio: AudioState,
+    pub cutter: CutterState,
     pub thumbs: HashMap<String, (u64, egui::TextureHandle)>,
     pub set_thumbs: HashMap<String, (u64, egui::TextureHandle)>,
 
@@ -130,6 +135,7 @@ impl App {
             builder: BuilderState::default(),
             ai: AiState::default(),
             audio: AudioState::default(),
+            cutter: CutterState::default(),
             thumbs: HashMap::new(),
             set_thumbs: HashMap::new(),
             jump_to: None,
@@ -158,6 +164,7 @@ impl App {
                 "character" => RightTab::Character,
                 "inspector" => RightTab::Inspector,
                 "audio" => RightTab::Audio,
+                "cutter" => RightTab::Cutter,
                 "ai" => RightTab::Ai,
                 _ => RightTab::Script,
             };
@@ -628,6 +635,11 @@ impl App {
         if f == 10 && self.startup.demo_record {
             self.sel_actor = Some("Blob".into());
             self.start_recording();
+        }
+        if f == 2 {
+            if let Some(p) = self.startup.cut_image.clone() {
+                self.cutter.open(ctx, p);
+            }
         }
         if f == 3 {
             if let Some(out) = self.startup.export.clone() {

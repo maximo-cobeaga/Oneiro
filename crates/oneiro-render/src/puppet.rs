@@ -5,10 +5,43 @@
 use crate::character::{draw_face, Placement, View};
 use crate::draw::Painter;
 use crate::pose::{self, Limb, P2};
+use oneiro_core::defs::SvgPart;
+use oneiro_core::raster::Raster;
 use oneiro_core::svg::{Seg, SvgDoc};
 use oneiro_core::{CharacterDef, Dims};
 use oneiro_core::timeline::ActorFrame;
-use tiny_skia::{Path, PathBuilder, Pixmap, Transform};
+use tiny_skia::{FilterQuality, Path, PathBuilder, Pixmap, PixmapPaint, Transform};
+
+/// The drawing of a part: vector (tier B) or a PNG cut from an illustration (tier C).
+#[derive(Clone, Copy)]
+enum Art<'a> {
+    Svg(&'a SvgDoc),
+    Raster(&'a Raster),
+}
+
+impl Art<'_> {
+    fn aspect(&self) -> f32 {
+        match self {
+            Art::Svg(d) => d.aspect(),
+            Art::Raster(r) => r.aspect(),
+        }
+    }
+}
+
+fn art_of(p: &SvgPart) -> Option<Art<'_>> {
+    p.doc.as_deref().map(Art::Svg).or_else(|| p.raster.as_deref().map(Art::Raster))
+}
+
+/// Scales the colors of a premultiplied pixmap by the scene tint (night scenes are bluish).
+fn tinted(src: &Pixmap, tint: [f64; 3]) -> Pixmap {
+    let mut out = src.clone();
+    for px in out.data_mut().chunks_mut(4) {
+        for c in 0..3 {
+            px[c] = (px[c] as f64 * tint[c]).clamp(0.0, 255.0) as u8;
+        }
+    }
+    out
+}
 
 pub fn seg_path(segs: &[Seg]) -> Option<Path> {
     let mut pb = PathBuilder::new();
@@ -34,7 +67,27 @@ struct Place {
     ys: f32,
 }
 
-fn draw_part(p: &mut Painter, base: Transform, doc: &SvgDoc, pivot: (f64, f64), height_m: f32, pl: &Place) {
+fn draw_part(p: &mut Painter, base: Transform, art: Art, pivot: (f64, f64), height_m: f32, pl: &Place) {
+    let doc = match art {
+        Art::Svg(d) => d,
+        Art::Raster(r) => {
+            let (w, h) = (r.width() as f32, r.height() as f32);
+            let k = height_m / h;
+            let tf = base
+                .pre_translate(pl.anchor.0, pl.anchor.1)
+                .pre_rotate(pl.angle.to_degrees())
+                .pre_scale(k * pl.flip * pl.xs, -k * pl.ys)
+                .pre_translate(-(pivot.0 as f32 * w), -(pivot.1 as f32 * h));
+            let paint = PixmapPaint { quality: FilterQuality::Bilinear, ..Default::default() };
+            if p.tint.iter().all(|t| (*t - 1.0).abs() < 1e-3) {
+                p.pm.draw_pixmap(0, 0, r.pm.as_ref(), &paint, tf, None);
+            } else {
+                let t = tinted(&r.pm, p.tint);
+                p.pm.draw_pixmap(0, 0, t.as_ref(), &paint, tf, None);
+            }
+            return;
+        }
+    };
     let [vx, vy, vw, vh] = doc.vb;
     let k = height_m / vh;
     let (px, py) = (vx + pivot.0 as f32 * vw, vy + pivot.1 as f32 * vh);
@@ -66,14 +119,14 @@ pub fn dims_of(def: &CharacterDef) -> Option<Dims> {
     let hh = def.height();
     let (head, body, arm, leg) = (rig.parts.get("head")?, rig.parts.get("body")?, rig.parts.get("arm")?, rig.parts.get("leg")?);
     let body_h = body.height * hh;
-    Some(Dims { leg: leg.height * hh, torso_h: body_h, torso_w: body_h * body.doc.as_ref()?.aspect() as f64, head_r: head.height * hh * 0.5, arm_len: arm.height * hh, neck: 0.0 })
+    Some(Dims { leg: leg.height * hh, torso_h: body_h, torso_w: body_h * art_of(body)?.aspect() as f64, head_r: head.height * hh * 0.5, arm_len: arm.height * hh, neck: 0.0 })
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn draw_puppet(pm: &mut Pixmap, def: &CharacterDef, fr: &ActorFrame, v: &View, pl: &Placement, tint: [f64; 3], px: f32, outline: f32) {
     let (Some(rig), Some(dm)) = (def.svg.as_ref(), dims_of(def)) else { return };
     let (Some(head), Some(body), Some(arm), Some(leg)) = (rig.parts.get("head"), rig.parts.get("body"), rig.parts.get("arm"), rig.parts.get("leg")) else { return };
-    let (Some(hd), Some(bd), Some(ad), Some(ld)) = (head.doc.as_ref(), body.doc.as_ref(), arm.doc.as_ref(), leg.doc.as_ref()) else { return };
+    let (Some(hd), Some(bd), Some(ad), Some(ld)) = (art_of(head), art_of(body), art_of(arm), art_of(leg)) else { return };
     let hh = def.height() as f32;
     let s = pl.scale;
     let base = Transform::from_translate(pl.sx, pl.sy).pre_scale(s, -s);
@@ -85,10 +138,10 @@ pub fn draw_puppet(pm: &mut Pixmap, def: &CharacterDef, fr: &ActorFrame, v: &Vie
     let (leg_h, body_h, head_h, arm_h) = (dm.leg as f32, dm.torso_h as f32, (dm.head_r * 2.0) as f32, dm.arm_len as f32);
 
     // Legs (under the body).
-    for l in &pose.legs {
+    for (k, l) in pose.legs.iter().enumerate() {
         let (angle, len) = aim(l);
         let ys = (len / (leg_h * 0.97)).clamp(0.6, 1.15);
-        draw_part(&mut p, base, ld, leg.pivot, leg_h, &Place { anchor: l.root, angle, flip: dir, xs: turn, ys });
+        draw_part(&mut p, base, ld, leg.pivot, leg_h, &Place { anchor: l.root, angle, flip: pair_flip(ld, k, af, dir), xs: turn, ys });
     }
 
     // Upper body swings a little while walking.
@@ -99,7 +152,7 @@ pub fn draw_puppet(pm: &mut Pixmap, def: &CharacterDef, fr: &ActorFrame, v: &Vie
         let a = &pose.arms[idx];
         let (angle, len) = aim(a);
         let ys = (len / (arm_h * 0.92)).clamp(0.55, 1.2);
-        draw_part(p, upper, ad, arm.pivot, arm_h, &Place { anchor: a.root, angle, flip: dir, xs: 0.75 + 0.25 * af, ys });
+        draw_part(p, upper, ad, arm.pivot, arm_h, &Place { anchor: a.root, angle, flip: pair_flip(ad, idx, af, dir), xs: 0.75 + 0.25 * af, ys });
     };
     if far_first {
         arm_at(&mut p, far_idx);
@@ -131,5 +184,21 @@ pub fn draw_puppet(pm: &mut Pixmap, def: &CharacterDef, fr: &ActorFrame, v: &Vie
         let r = head_h * 0.5 * rig.face_scale as f32 * 0.92;
         // Eyes sit a little above the face center and the mouth below it (see draw_face).
         draw_face(&mut p, def, fr, v, fx, pose.sh + fy, r, 2.4 * px / s * outline);
+    }
+}
+
+/// Parts cut from an illustration (tier C) are drawn once, for the character's left side; the right
+/// arm and leg are their mirror image while the character faces the camera. Vector parts are
+/// symmetric by construction and simply follow the facing direction.
+fn pair_flip(art: Art, side: usize, front: f32, dir: f32) -> f32 {
+    match art {
+        Art::Raster(_) if front > 0.5 => {
+            if side == 0 {
+                1.0
+            } else {
+                -1.0
+            }
+        }
+        _ => dir,
     }
 }

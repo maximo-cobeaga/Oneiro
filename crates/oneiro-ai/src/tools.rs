@@ -145,6 +145,27 @@ impl Toolbox {
                 description: "Builds the final soundtrack of the saved script and reports its peak and loudness (dBFS), how many voices, effects and music tracks it has, and warnings (limiter engaged, too quiet). Optionally writes it to a WAV.",
                 schema: json!({"type": "object", "properties": {"output": {"type": "string", "description": "Optional path of a WAV to write."}}}),
             },            ToolDef {
+                name: "propose_cut",
+                description: "Hybrid cutter, step 1: looks at an illustration of ONE character (front view, standing, arms at the sides; PNG with transparency or on a plain background; other formats need ffmpeg) and returns (a) an image with four numbered boxes drawn on it (1 head, 2 body, 3 arm, 4 leg; faint boxes are the mirrored right arm and leg), (b) the layout as JSON with normalized coordinates [x0, y0, x1, y1] and (c) the validator's problems in plain words. Pass `layout` (the same JSON, possibly edited by you) to check and draw your own boxes. Iterate until there are no errors, then call cut_character.",
+                schema: json!({"type": "object", "properties": {
+                    "image": {"type": "string", "description": "Path of the illustration (absolute, or relative to the project)."},
+                    "layout": {"type": "string", "description": "Optional layout JSON {\"head\": [..], \"body\": [..], \"arm\": [..], \"leg\": [..]} to validate instead of the automatic proposal."},
+                    "tolerance": {"type": "number", "description": "Background color tolerance (0-441); automatic by default."}
+                }, "required": ["image"]}),
+            },
+            ToolDef {
+                name: "cut_character",
+                description: "Hybrid cutter, step 2: cuts the illustration with the layout (validated again: nothing is saved if there are errors), saves the four PNG pieces to library/parts/<Name>/ and the character to library/characters/<Name>.onchar. The illustration's own face is kept. Then use it with `use character <Name>` and look at it with render_still.",
+                schema: json!({"type": "object", "properties": {
+                    "image": {"type": "string"},
+                    "name": {"type": "string", "description": "Character name: a capital letter, then letters, digits or underscores."},
+                    "layout": {"type": "string", "description": "Layout JSON; omit to use the automatic proposal."},
+                    "height_m": {"type": "number", "description": "Character height in meters (default 1.15)."},
+                    "style": {"type": "string", "description": "Optional own style: cutout_2d, rubber_hose or clay."},
+                    "tolerance": {"type": "number"}
+                }, "required": ["image", "name"]}),
+            },
+            ToolDef {
                 name: "write_character_parts",
                 description: "Creates a character DRAWN as vector parts (see the guide's 'vector characters' section): validates the `character` source and the four SVG parts (head, body, arm, leg) with the real engine, saves the SVGs to library/parts/<Name>/ and the character to library/characters/<Name>.onchar. Returns every problem found so you can fix and call it again. Render a still afterwards to look at the result.",
                 schema: json!({"type": "object", "properties": {
@@ -203,7 +224,7 @@ impl Toolbox {
                 s.push_str(guide::CHARACTER_GUIDE);
                 s.push_str("\n\n");
                 s.push_str(guide::PARTS_GUIDE);
-                s.push_str("\n\n## Tools\nUse check_script after every change, contact_sheet / render_still to look at the result, write_script to save, write_character to create characters.\n");
+                s.push_str("\n\n## Tools\nUse check_script after every change, contact_sheet / render_still to look at the result, write_script to save, write_character to create characters from blocks, write_character_parts to draw one as SVG, propose_cut + cut_character to cut one out of an illustration (front view, plain background), generate_voices / generate_sound / mix_audio for audio.\n");
                 Ok(ToolOutput::ok(s))
             }
             "read_script" => Ok(ToolOutput::ok(self.read_script()?)),
@@ -427,7 +448,39 @@ impl Toolbox {
                     s.push_str(&format!(" Wrote {}.", out));
                 }
                 Ok(ToolOutput::ok(s))
-            }            "write_character_parts" => {
+            }            "propose_cut" | "cut_character" => {
+                let image = args.get("image").and_then(|s| s.as_str()).ok_or("`image` is required")?;
+                let path = if Path::new(image).is_absolute() { PathBuf::from(image) } else { self.root.join(image) };
+                let img = oneiro_cutter::Image::load(&path)?;
+                let tol = args.get("tolerance").and_then(|t| t.as_f64()).map(|t| t as f32);
+                let mask = oneiro_cutter::extract_mask(&img, tol)?;
+                let layout = match args.get("layout").and_then(|l| l.as_str()) {
+                    Some(text) => oneiro_cutter::Layout::from_json(text)?,
+                    None => oneiro_cutter::propose(&mask)?,
+                };
+                let issues = oneiro_cutter::validate(&layout, &mask);
+                let problems = if issues.is_empty() { "No problems found.".to_string() } else { issues.iter().map(|i| format!("- {}", i.render())).collect::<Vec<_>>().join("\n") };
+                let has_errors = issues.iter().any(|i| i.is_error());
+                if name == "propose_cut" {
+                    let cx = Some(mask.axis());
+                    let over = oneiro_cutter::overlay::draw(&img, &layout, cx);
+                    let png = over.encode_png().map_err(|e| e.to_string())?;
+                    return Ok(ToolOutput { text: format!("Layout:\n{}\n\nValidation:\n{}\n\n{}", layout.to_json(), problems, if has_errors { "Fix the errors (edit the JSON and call propose_cut again) before cut_character." } else { "Looks usable: call cut_character with this layout." }), images: vec![png], is_error: false });
+                }
+                let cname = args.get("name").and_then(|s| s.as_str()).ok_or("`name` is required")?;
+                if has_errors {
+                    return Ok(ToolOutput::err(format!("Not saved: the layout has errors.\n{}", problems)));
+                }
+                let cut = oneiro_cutter::cut(&img, &mask, &layout)?;
+                let opts = oneiro_cutter::WriteOpts {
+                    height_m: args.get("height_m").and_then(|h| h.as_f64()).unwrap_or(1.15),
+                    style: args.get("style").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                    source: path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default(),
+                };
+                let out = oneiro_cutter::write_character(&self.root, cname, &cut, &opts)?;
+                Ok(ToolOutput::ok(format!("Saved {} and 4 PNG parts under library/parts/{}/. Warnings:\n{}\nUse it with `use character {}`.", out.display(), cname, problems, cname)))
+            }
+            "write_character_parts" => {
                 let source = args.get("source").and_then(|s| s.as_str()).ok_or("`source` is required")?;
                 let svgs: std::collections::BTreeMap<String, String> = args
                     .get("svgs")

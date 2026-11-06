@@ -2480,6 +2480,7 @@ version = "0.1.0"
 dependencies = [
  "oneiro-audio",
  "oneiro-core",
+ "oneiro-cutter",
  "oneiro-lang",
  "oneiro-render",
  "oneiro-voice",
@@ -2503,6 +2504,7 @@ dependencies = [
  "oneiro-ai",
  "oneiro-audio",
  "oneiro-core",
+ "oneiro-cutter",
  "oneiro-lang",
  "oneiro-render",
  "oneiro-voice",
@@ -2514,6 +2516,18 @@ version = "0.1.0"
 dependencies = [
  "oneiro-audio",
  "oneiro-lang",
+ "tiny-skia",
+]
+
+[[package]]
+name = "oneiro-cutter"
+version = "0.1.0"
+dependencies = [
+ "oneiro-core",
+ "oneiro-lang",
+ "oneiro-render",
+ "serde_json",
+ "tiny-skia",
 ]
 
 [[package]]
@@ -2524,6 +2538,7 @@ dependencies = [
  "oneiro-ai",
  "oneiro-audio",
  "oneiro-core",
+ "oneiro-cutter",
  "oneiro-lang",
  "oneiro-render",
  "oneiro-voice",

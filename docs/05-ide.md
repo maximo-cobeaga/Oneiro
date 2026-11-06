@@ -79,6 +79,9 @@ expression and mouth shape, can talk (cycles visemes) and walk in place. **Save 
 vector parts show a note and keep their own proportions. In the AI tab, *Design a character* has a *Draw it as vector parts (SVG)*
 option; the proposal is saved to the library with its SVG files (see [08-styles.md](08-styles.md)).
 
+**Cutter tab** (Phase 6): open an illustration of a character, get the head/body/arm/leg boxes (automatic or AI), drag them, watch the
+checker and the assembled puppet, and create the character. See [09-cutter.md](09-cutter.md).
+
 ## Rendering from the IDE
 
 **File > Render mp4** (preview 640x360, HD 720p or Full HD 1080p) renders in a background thread with a progress bar

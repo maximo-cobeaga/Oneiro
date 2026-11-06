@@ -3,6 +3,7 @@
 
 mod ai_cmds;
 mod audio_cmds;
+mod cut_cmds;
 
 use oneiro_audio::{synth, write_wav, SR};
 use oneiro_core::lock::{self, Lock};
@@ -23,6 +24,8 @@ USAGE:
                 [--no-audio] [--hash] [--png-dir DIR] [--no-write]
   oneiro still <project|script.onr> --time SECONDS [-o frame.png] [--res WxH]
   oneiro demo-audio <project|script.onr> [--force]   placeholder voices/sounds for files a script references
+  oneiro cut <image> [project] [--name Name] [--layout file.json] [--ai] [--overlay out.png] [--height 1.15] [--style S]
+        cut an illustration (front view, plain background or transparent PNG) into a rigged character
   oneiro voice <project> [--provider demo|sapi|elevenlabs|openai|command] [--force] [--only A,B] [--dry-run]
         synthesize the dialogue lines that have no audio and write the audio clauses
   oneiro voices [provider]                       list the voices a provider offers
@@ -159,6 +162,7 @@ fn main() -> ExitCode {
         "still" => cmd_still(rest),
         "demo-audio" => cmd_demo_audio(rest),
         "voice" => audio_cmds::cmd_voice(rest),
+        "cut" => cut_cmds::cmd_cut(rest),
         "voices" => audio_cmds::cmd_voices(rest),
         "sound" => audio_cmds::cmd_sound(rest),
         "import" => audio_cmds::cmd_import(rest),

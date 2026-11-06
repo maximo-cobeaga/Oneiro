@@ -4,6 +4,7 @@
 
 pub mod b64;
 pub mod config;
+pub mod cutter_ai;
 pub mod director;
 pub mod guide;
 pub mod mcp;

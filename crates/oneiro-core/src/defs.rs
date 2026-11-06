@@ -4,6 +4,7 @@ use crate::catalog::*;
 use crate::math::Rgb;
 use oneiro_lang::suggest::did_you_mean;
 use oneiro_lang::{entry, Block, Diagnostic, Entry, Pos, Value};
+use crate::raster::Raster;
 use crate::svg::{parse_svg, SvgDoc};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -20,6 +21,8 @@ pub struct SvgPart {
     pub pivot: (f64, f64),
     /// The parsed drawing; filled in by `CharacterDef::load_svg_parts`.
     pub doc: Option<Arc<SvgDoc>>,
+    /// Set instead of `doc` when `file` is a PNG (a part cut out of an illustration, tier C).
+    pub raster: Option<Arc<Raster>>,
 }
 
 /// A character drawn with its own vector parts instead of library blocks.
@@ -327,7 +330,7 @@ fn parse_parts(inner: &[Entry], file: &str, owner: &str, diags: &mut Vec<Diagnos
             diags.push(Diagnostic::error("E1112", file, pe.pos, format!("part '{}' height {} is outside 0.05..1.0 (a fraction of the character's height)", pe.key, height)));
         }
         let pivot = tuple2(entry(b, "pivot").and_then(|x| x.value())).unwrap_or(p0);
-        rig.parts.insert(pe.key.clone(), SvgPart { file: f.to_string(), height: height.clamp(0.05, 1.0), pivot, doc: None });
+        rig.parts.insert(pe.key.clone(), SvgPart { file: f.to_string(), height: height.clamp(0.05, 1.0), pivot, doc: None, raster: None });
     }
     for need in SVG_PARTS {
         if !rig.parts.contains_key(*need) {
@@ -340,7 +343,7 @@ fn parse_parts(inner: &[Entry], file: &str, owner: &str, diags: &mut Vec<Diagnos
 impl CharacterDef {
     /// True when the character has all its vector parts loaded and valid.
     pub fn has_svg(&self) -> bool {
-        self.svg.as_ref().map_or(false, |s| s.parts.len() == SVG_PARTS.len() && s.parts.values().all(|p| p.doc.is_some()))
+        self.svg.as_ref().map_or(false, |s| s.parts.len() == SVG_PARTS.len() && s.parts.values().all(|p| p.doc.is_some() || p.raster.is_some()))
     }
 
     /// Reads and validates the SVG files of a tier-B character (paths relative to `root`).
@@ -351,6 +354,19 @@ impl CharacterDef {
             // Keep parts inside the project: no absolute paths or `..`.
             if Path::new(&part.file).is_absolute() || part.file.split(['/', '\\']).any(|s| s == "..") {
                 diags.push(Diagnostic::error("E1115", label, at, format!("part '{}': the file must be inside the project (no absolute paths or '..')", name)));
+                continue;
+            }
+            if part.file.to_lowercase().ends_with(".png") {
+                match std::fs::read(root.join(&part.file)).map_err(|e| e.to_string()).and_then(|b| Raster::from_png(&b)) {
+                    Err(e) => diags.push(Diagnostic::error("E1115", label, at, format!("part '{}' ({}): {}", name, part.file, e))),
+                    Ok(r) => {
+                        if !(0.0..=1.0).contains(&part.pivot.0) || !(0.0..=1.0).contains(&part.pivot.1) {
+                            diags.push(Diagnostic::error("E1117", label, at, format!("{}: the pivot must be inside the part (both numbers between 0 and 1) ({})", name, part.file)));
+                        } else {
+                            part.raster = Some(Arc::new(r));
+                        }
+                    }
+                }
                 continue;
             }
             let src = match std::fs::read_to_string(root.join(&part.file)) {

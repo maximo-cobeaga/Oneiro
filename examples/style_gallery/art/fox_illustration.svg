@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600">
+<g stroke="#2a1a10" stroke-width="3" stroke-linejoin="round">
+<path d="M290 400 C380 380 390 470 340 520 C320 540 290 500 300 470 C305 450 285 430 290 400 Z" fill="#f28c28"/>
+<path d="M335 505 C320 530 305 515 305 495 C320 490 330 495 335 505 Z" fill="#ffffff"/>
+<rect x="150" y="440" width="38" height="110" rx="14" fill="#f28c28"/>
+<rect x="212" y="440" width="38" height="110" rx="14" fill="#f28c28"/>
+<ellipse cx="160" cy="560" rx="34" ry="18" fill="#7a3f1a"/>
+<ellipse cx="240" cy="560" rx="34" ry="18" fill="#7a3f1a"/>
+<rect x="150" y="515" width="38" height="30" fill="#7a3f1a"/>
+<rect x="212" y="515" width="38" height="30" fill="#7a3f1a"/>
+<ellipse cx="160" cy="560" rx="34" ry="18" fill="#7a3f1a"/>
+<ellipse cx="240" cy="560" rx="34" ry="18" fill="#7a3f1a"/>
+<ellipse cx="200" cy="370" rx="75" ry="100" fill="#f28c28"/>
+<ellipse cx="200" cy="395" rx="45" ry="70" fill="#fff3e0"/>
+<rect x="102" y="300" width="36" height="130" rx="18" fill="#f28c28"/>
+<rect x="262" y="300" width="36" height="130" rx="18" fill="#f28c28"/>
+<circle cx="120" cy="436" r="20" fill="#7a3f1a"/>
+<circle cx="280" cy="436" r="20" fill="#7a3f1a"/>
+<polygon points="115,130 130,30 185,95" fill="#f28c28"/>
+<polygon points="285,130 270,30 215,95" fill="#f28c28"/>
+<polygon points="133,100 138,57 168,95" fill="#7a3f1a"/>
+<polygon points="267,100 262,57 232,95" fill="#7a3f1a"/>
+<ellipse cx="200" cy="165" rx="95" ry="80" fill="#f28c28"/>
+<path d="M105 185 C130 250 270 250 295 185 C260 205 140 205 105 185 Z" fill="#fff3e0"/>
+<path d="M150 215 C160 200 240 200 250 215 C240 250 160 250 150 215 Z" fill="#fff3e0"/>
+<ellipse cx="200" cy="205" rx="16" ry="12" fill="#2a1a10"/>
+<circle cx="160" cy="150" r="14" fill="#ffffff"/>
+<circle cx="240" cy="150" r="14" fill="#ffffff"/>
+<circle cx="163" cy="152" r="7" fill="#2a1a10"/>
+<circle cx="237" cy="152" r="7" fill="#2a1a10"/>
+<path d="M180 225 C190 240 210 240 220 225" fill="none"/>
+<path d="M120 262 C150 295 250 295 280 262 L285 305 C250 335 150 335 115 305 Z" fill="#3fa34d"/>
+<rect x="215" y="295" width="40" height="85" rx="10" fill="#3fa34d"/>
+<path d="M225 320 L245 320 M225 345 L245 345" fill="none" stroke="#2f7d3a"/>
+</g>
+</svg>

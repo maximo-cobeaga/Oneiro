@@ -7,6 +7,7 @@ pub mod defs;
 pub mod lock;
 pub mod math;
 pub mod project;
+pub mod raster;
 pub mod svg;
 pub mod timeline;
 

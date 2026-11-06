@@ -23,7 +23,7 @@ scene 1 "Late order" in diner {
 }
 ```
 
-## Status: Phases 0-5 done (language, CLI renderer, IDE, AI integration, audio studio, styles)
+## Status: Phases 0-6 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter)
 
 - **Language + CLI:** parser, solver, CPU renderer, lipsync and mp4 export in the `cutout_2d` (South Park-like) style, on CPU only.
 - **Oneiro Studio (IDE):** live viewport, script editor with diagnostics, timeline, library, block-based character builder,
@@ -35,7 +35,9 @@ scene 1 "Late order" in diner {
 
 - **Styles:** `cutout_2d`, `rubber_hose` and `clay`, chosen per character so one scene can mix them, plus **vector characters** drawn as SVG parts (by hand or by an AI) that Oneiro rigs, animates and lip-syncs. See [docs/08-styles.md](docs/08-styles.md).
 
-Next: the hybrid cutter (tier C: from an image to a rigged character), then 3D. See [docs/04-roadmap.md](docs/04-roadmap.md).
+- **Hybrid cutter:** turn an illustration (plain background or transparent PNG) into an animated character: Oneiro or a vision AI proposes the head, body, arm and leg, you drag the boxes, the engine validates. See [docs/09-cutter.md](docs/09-cutter.md).
+
+Next: 3D (`toon_3d`), physics and cloth, then polish. See [docs/04-roadmap.md](docs/04-roadmap.md).
 
 ![Oneiro Studio](docs/img/ide-overview.png)
 
@@ -86,6 +88,7 @@ value) and `state.out` (story state).
 | [docs/06-ai.md](docs/06-ai.md) | AI director, providers, MCP server, what was verified |
 | [docs/07-audio.md](docs/07-audio.md) | Audio studio: voices, SFX, music, mixing, IDE tab, commands |
 | [docs/08-styles.md](docs/08-styles.md) | Styles per character, vector (SVG) characters, AI-drawn characters |
+| [docs/09-cutter.md](docs/09-cutter.md) | The hybrid cutter: from an illustration to a rigged character |
 | [examples/style_gallery/](examples/style_gallery/) | Hybrid and clay episodes, vector characters |
 | [examples/first_short/](examples/first_short/) | The Phase 1 example project |
 

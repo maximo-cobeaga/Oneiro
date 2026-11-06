@@ -79,7 +79,9 @@ character Pip {
 - `pivot` is the joint the part turns around, as (x, y) from 0 to 1 inside the viewBox (top-left = (0, 0)): the neck
   or hips for head/body, the shoulder or hip for arm/leg. `file` may be left out: it defaults to
   `library/parts/<Name>/<part>.svg`.
-- `face { mode: auto }` makes Oneiro draw eyes, eyebrows and the lip-synced mouth at (`x`, `y`) of the head
+- Parts can also be `.png` files cut from an illustration (tier C, see [09-cutter.md](09-cutter.md)): `file: "library/parts/Name/head.png"` (the cutter writes them, with `face { mode: none }`).
+
+`face { mode: auto }` makes Oneiro draw eyes, eyebrows and the lip-synced mouth at (`x`, `y`) of the head
   (`scale` sizes them); use `mode: none` if the head SVG already includes a face.
 - Turning is done like a cutout: parts are flipped toward the walking direction and compressed when seen from the
   side; seen from behind the face is not drawn. The arm and leg drawings are used for both sides.

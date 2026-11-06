@@ -17,6 +17,7 @@ impl App {
             ui.selectable_value(&mut self.right_tab, RightTab::Character, "Character builder");
             ui.selectable_value(&mut self.right_tab, RightTab::Inspector, "Inspector");
             ui.selectable_value(&mut self.right_tab, RightTab::Audio, "Audio");
+            ui.selectable_value(&mut self.right_tab, RightTab::Cutter, "Cutter");
             ui.selectable_value(&mut self.right_tab, RightTab::Ai, "AI");
         });
         ui.separator();
@@ -25,6 +26,7 @@ impl App {
             RightTab::Character => self.ui_builder(ui),
             RightTab::Inspector => self.ui_inspector(ui),
             RightTab::Audio => self.ui_audio(ui),
+            RightTab::Cutter => self.ui_cutter(ui),
             RightTab::Ai => self.ui_ai(ui),
         }
     }

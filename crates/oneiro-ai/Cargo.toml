@@ -9,6 +9,7 @@ oneiro-lang = { path = "../oneiro-lang" }
 oneiro-core = { path = "../oneiro-core" }
 oneiro-audio = { path = "../oneiro-audio" }
 oneiro-voice = { path = "../oneiro-voice" }
+oneiro-cutter = { path = "../oneiro-cutter" }
 oneiro-render = { path = "../oneiro-render" }
 serde_json = "1"
 ureq = "3"
