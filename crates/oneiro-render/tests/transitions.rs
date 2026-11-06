@@ -40,3 +40,12 @@ fn fade_white_and_dissolve_and_wipes_render() {
         assert_ne!(m.data(), r.render_at(3.0).data(), "{}", k);
     }
 }
+
+#[test]
+fn shadows_follow_the_time_of_day() {
+    use oneiro_render::light_dir;
+    let (d, n, k) = (light_dir("day"), light_dir("night"), light_dir("dusk"));
+    let l = |v: [f64; 2]| (v[0] * v[0] + v[1] * v[1]).sqrt();
+    assert!(l(k) > l(d) && l(d) > l(n), "dusk shadows are longest, night shortest");
+    assert!(d[0] > 0.0 && k[0] < 0.0, "the sun moves from one side to the other");
+}

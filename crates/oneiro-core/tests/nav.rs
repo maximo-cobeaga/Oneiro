@@ -144,3 +144,15 @@ fn tables_are_walked_around_too() {
         assert!(!table.inflate(r - 0.02).contains(p), "through the table at {:?}", p);
     }
 }
+
+#[test]
+fn any_prop_can_be_made_solid_or_walkable() {
+    let mut set = project().sets["diner"].clone();
+    let n0 = nav::footprints(&set).len();
+    let pie = set.props.iter_mut().find(|p| p.kind == "pie_case").unwrap();
+    pie.solid = Some(true);
+    assert_eq!(nav::footprints(&set).len(), n0 + 1, "pie_case becomes an obstacle");
+    let stool = set.props.iter_mut().find(|p| p.kind == "stool").unwrap();
+    stool.solid = Some(false);
+    assert_eq!(nav::footprints(&set).len(), n0, "a stool set to solid: false is walkable");
+}

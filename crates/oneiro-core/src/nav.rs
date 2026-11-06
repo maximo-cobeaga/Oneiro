@@ -83,11 +83,16 @@ fn footprint(p: &PropInst) -> Option<Obb> {
     if p.wall.is_some() {
         return None;
     }
+    if p.solid == Some(false) {
+        return None;
+    }
     let (w, d) = match p.kind.as_str() {
         // The counter top overhangs the front by 7 cm on each side (see the renderer).
         "counter" => (p.w.unwrap_or(5.0), p.d.unwrap_or(0.8) + 0.14),
         "table" => (p.w.unwrap_or(1.2), p.d.unwrap_or(0.8)),
         "stool" => (p.w.unwrap_or(0.56) * 0.9, p.w.unwrap_or(0.56) * 0.9),
+        // Anything else only blocks when asked to (`solid: true`), with its own width and depth.
+        _ if p.solid == Some(true) => (p.w.unwrap_or(0.8), p.d.unwrap_or(0.6)),
         _ => return None,
     };
     Some(Obb { c: p.at, hw: w / 2.0, hd: d / 2.0, yaw: p.yaw })
