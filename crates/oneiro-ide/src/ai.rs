@@ -437,7 +437,7 @@ impl App {
                 AiMode::Scene => "What should happen? (Ctrl+Enter to send)",
                 AiMode::Character => "Describe the character: look, age, personality... (Ctrl+Enter to send)",
             };
-            let out = egui::TextEdit::multiline(&mut self.ai.input).desired_rows(3).desired_width(f32::INFINITY).hint_text(hint).show(ui);
+            let out = egui::ScrollArea::vertical().max_height(130.0).id_salt("ai_input_scroll").show(ui, |ui| egui::TextEdit::multiline(&mut self.ai.input).desired_rows(3).desired_width(f32::INFINITY).hint_text(hint).show(ui)).inner;
             let ctrl_enter = out.response.has_focus() && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter));
             ui.horizontal(|ui| {
                 if ui.add_enabled(!self.ai_busy() && !self.ai.input.trim().is_empty(), egui::Button::new(RichText::new("Send").strong())).clicked() || (ctrl_enter && !self.ai_busy()) {
@@ -475,7 +475,7 @@ impl App {
                     ChatItem::User(t) => {
                         egui::Frame::group(ui.style()).fill(Color32::from_rgb(40, 38, 62)).show(ui, |ui| {
                             ui.label(RichText::new("You").strong().small());
-                            ui.label(t);
+                            ui.add(egui::Label::new(t.as_str()).wrap());
                         });
                     }
                     ChatItem::Info(t) => {
@@ -484,7 +484,7 @@ impl App {
                     ChatItem::Error(t) => {
                         egui::Frame::group(ui.style()).fill(Color32::from_rgb(70, 30, 30)).show(ui, |ui| {
                             ui.label(RichText::new("Problem").strong().small());
-                            ui.label(t);
+                            ui.add(egui::Label::new(t.as_str()).wrap());
                         });
                     }
                     ChatItem::Ai { text, notes, proposal, footer } => {

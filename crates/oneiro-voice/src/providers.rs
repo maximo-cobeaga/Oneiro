@@ -141,6 +141,11 @@ impl Sapi {
         let script = dir.join("sapi.ps1");
         std::fs::write(&script, SAPI_SCRIPT).map_err(|e| e.to_string())?;
         let mut cmd = Command::new("powershell.exe");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000);
+        }
         cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]).arg(&script);
         for (k, v) in envs {
             cmd.env(k, v);
@@ -369,7 +374,13 @@ impl VoiceProvider for CommandTts {
             .map(|p| p.replace("{text}", &req.text).replace("{out}", &out.display().to_string()).replace("{voice}", &req.voice).replace("{speed}", &format!("{}", req.speed)))
             .collect();
         let (program, args) = parts.split_first().ok_or("empty command")?;
-        let mut child = Command::new(program)
+        let mut cmdp = Command::new(program);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmdp.creation_flags(0x0800_0000);
+        }
+        let mut child = cmdp
             .args(args)
             .stdin(if text_in_args { Stdio::null() } else { Stdio::piped() })
             .stdout(Stdio::null())
@@ -391,4 +402,64 @@ impl VoiceProvider for CommandTts {
         let _ = std::fs::remove_file(&out);
         a.map_err(|e| format!("the command did not produce a readable file at {{out}}: {}", e))
     }
+}
+
+// ------------------------------------------------------------------ voice cloning (ElevenLabs)
+
+/// A multipart/form-data body: text fields, then audio files.
+pub fn multipart_body(boundary: &str, fields: &[(&str, &str)], files: &[(&str, String, Vec<u8>)]) -> Vec<u8> {
+    let mut b: Vec<u8> = Vec::new();
+    for (k, v) in fields {
+        b.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").as_bytes());
+    }
+    for (k, name, data) in files {
+        b.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"; filename=\"{name}\"\r\nContent-Type: application/octet-stream\r\n\r\n").as_bytes());
+        b.extend_from_slice(data);
+        b.extend_from_slice(b"\r\n");
+    }
+    b.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+    b
+}
+
+impl ElevenLabs {
+    /// Instant voice cloning: uploads one or more recordings of the same person and returns the new voice id.
+    /// Needs an ElevenLabs plan that includes voice cloning, and a voice you have the right to clone.
+    pub fn clone_voice(&self, name: &str, files: &[std::path::PathBuf]) -> Result<String, String> {
+        if name.trim().is_empty() {
+            return Err("give the voice a name".into());
+        }
+        if files.is_empty() {
+            return Err("choose at least one recording (a minute or more of clean speech works best)".into());
+        }
+        let mut parts = vec![];
+        for f in files {
+            let data = std::fs::read(f).map_err(|e| format!("{}: {}", f.display(), e))?;
+            if data.len() > 10_000_000 {
+                return Err(format!("{} is larger than 10 MB; use a shorter clip", f.display()));
+            }
+            parts.push(("files", f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "sample.wav".into()), data));
+        }
+        let boundary = format!("oneiro-{:016x}", oneiro_core::math::hash_str(name) ^ parts.len() as u64);
+        let body = multipart_body(&boundary, &[("name", name.trim())], &parts);
+        let url = format!("{}/v1/voices/add", self.base_url);
+        let mut resp = agent(180)
+            .post(&url)
+            .header("xi-api-key", self.key.as_str())
+            .header("content-type", &format!("multipart/form-data; boundary={}", boundary))
+            .send(&body[..])
+            .map_err(|e| format!("could not reach ElevenLabs: {}", e))?;
+        let status = resp.status().as_u16();
+        let bytes = resp.body_mut().read_to_vec().map_err(|e| e.to_string())?;
+        if status != 200 {
+            return Err(format!("ElevenLabs {}", http_error(status, &bytes)));
+        }
+        let v: Value = serde_json::from_slice(&bytes).map_err(|e| format!("invalid JSON from ElevenLabs: {}", e))?;
+        v.get("voice_id").and_then(|x| x.as_str()).map(|s| s.to_string()).ok_or_else(|| "ElevenLabs answered without a voice id".into())
+    }
+}
+
+/// Clones a voice with the configured ElevenLabs account.
+pub fn clone_voice(cfg: &crate::VoiceConfig, key: Option<&str>, name: &str, files: &[std::path::PathBuf]) -> Result<String, String> {
+    let key = key.map(|k| k.to_string()).or_else(|| std::env::var(&cfg.elevenlabs_key_env).ok().filter(|k| !k.is_empty())).ok_or_else(|| format!("no ElevenLabs key: set the {} environment variable or paste a key in the voice settings", cfg.elevenlabs_key_env))?;
+    ElevenLabs { key, model: cfg.elevenlabs_model.clone(), base_url: "https://api.elevenlabs.io".into() }.clone_voice(name, files)
 }

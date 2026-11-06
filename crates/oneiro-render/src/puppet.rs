@@ -107,6 +107,36 @@ fn draw_part(p: &mut Painter, base: Transform, art: Art, pivot: (f64, f64), heig
     }
 }
 
+/// Where the drawing really is inside its viewBox, as fractions (x0, y0, x1, y1; y from the top). AI-made
+/// parts often leave margins, which would leave gaps between neck, shoulders and arms.
+fn art_bbox(art: Art) -> (f64, f64, f64, f64) {
+    let Art::Svg(doc) = art else { return (0.0, 0.0, 1.0, 1.0) };
+    let [vx, vy, vw, vh] = doc.vb;
+    let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    for sh in &doc.shapes {
+        let half = sh.stroke.map(|(_, w)| w * 0.5).unwrap_or(0.0);
+        for s in &sh.segs {
+            let pts: &[(f32, f32)] = match *s {
+                Seg::Move(x, y) | Seg::Line(x, y) => &[(x, y)],
+                Seg::Quad(_, _, x, y) => &[(x, y)],
+                Seg::Cubic(_, _, _, _, x, y) => &[(x, y)],
+                Seg::Close => &[],
+            };
+            for &(x, y) in pts {
+                x0 = x0.min(x - half);
+                y0 = y0.min(y - half);
+                x1 = x1.max(x + half);
+                y1 = y1.max(y + half);
+            }
+        }
+    }
+    if x0 > x1 || vw <= 0.0 || vh <= 0.0 {
+        return (0.0, 0.0, 1.0, 1.0);
+    }
+    let f = |v: f32, o: f32, l: f32| (((v - o) / l) as f64).clamp(0.0, 1.0);
+    (f(x0, vx, vw), f(y0, vy, vh), f(x1, vx, vw), f(y1, vy, vh))
+}
+
 /// Angle that turns a part hanging down into the direction `from -> to`, and the distance.
 fn aim(l: &Limb) -> (f32, f32) {
     let (dx, dy) = (l.end.0 - l.root.0, l.end.1 - l.root.1);
@@ -119,7 +149,10 @@ pub fn dims_of(def: &CharacterDef) -> Option<Dims> {
     let hh = def.height();
     let (head, body, arm, leg) = (rig.parts.get("head")?, rig.parts.get("body")?, rig.parts.get("arm")?, rig.parts.get("leg")?);
     let body_h = body.height * hh;
-    Some(Dims { leg: leg.height * hh, torso_h: body_h, torso_w: body_h * art_of(body)?.aspect() as f64, head_r: head.height * hh * 0.5, arm_len: arm.height * hh, neck: 0.0 })
+    // The torso is what is really drawn: from the hips up to the top of the drawing, and as wide as the drawing.
+    let (bx0, by0, bx1, _) = art_bbox(art_of(body)?);
+    let visible_h = ((body.pivot.1 - by0) * body_h).max(0.3 * body_h);
+    Some(Dims { leg: leg.height * hh, torso_h: visible_h, torso_w: body_h * art_of(body)?.aspect() as f64 * (bx1 - bx0).max(0.3), head_r: head.height * hh * 0.5, arm_len: arm.height * hh, neck: 0.0 })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -172,7 +205,11 @@ pub fn draw_puppet(pm: &mut Pixmap, def: &CharacterDef, fr: &ActorFrame, v: &Vie
     let head_tf = upper.pre_rotate_at(pose.tilt, 0.0, pose.sh);
     let hxs = 0.62 + 0.38 * haf;
     let hys = 1.0 + if fr.speaking { 0.02 * fr.viseme.open } else { 0.0 };
-    let place = Place { anchor: (0.0, pose.sh), angle: 0.0, flip: hdir, xs: hxs, ys: hys };
+    // The head sits on the neck: lowered if its drawing leaves room under the chin, and a little into the shoulders.
+    let (_, _, _, hy1) = art_bbox(hd);
+    let drop = ((head.pivot.1 - hy1).max(0.0) as f32 + 0.04) * head_h;
+    let hsh = pose.sh - drop;
+    let place = Place { anchor: (0.0, hsh), angle: 0.0, flip: hdir, xs: hxs, ys: hys };
     draw_part(&mut p, head_tf, hd, head.pivot, head_h, &place);
 
     if rig.face && hfront > -0.05 {
@@ -180,10 +217,12 @@ pub fn draw_puppet(pm: &mut Pixmap, def: &CharacterDef, fr: &ActorFrame, v: &Vie
         let head_w = head_h * hd.aspect();
         let fx = hdir * (rig.face_x as f32 - head.pivot.0 as f32) * head_w * hxs;
         let fy = (head.pivot.1 as f32 - rig.face_y as f32) * head_h * hys;
-        p.tf = head_tf;
+        // The face is a decal on the head: it is squashed exactly like the head art (so it never leaves the
+        // silhouette) and slides only a little toward the side the head turns to.
+        p.tf = head_tf.pre_translate(fx, 0.0).pre_scale(hxs, 1.0).pre_translate(-fx, 0.0);
         let r = head_h * 0.5 * rig.face_scale as f32 * 0.92;
-        // Eyes sit a little above the face center and the mouth below it (see draw_face).
-        draw_face(&mut p, def, fr, v, fx, pose.sh + fy, r, 2.4 * px / s * outline);
+        let decal = View { h_front: 1.0, h_side: v.h_side * 0.3, ..*v };
+        draw_face(&mut p, def, fr, &decal, fx, hsh + fy, r, 2.4 * px / s * outline);
     }
 }
 

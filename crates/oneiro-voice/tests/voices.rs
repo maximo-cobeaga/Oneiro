@@ -284,3 +284,23 @@ fn config_round_trips_and_never_contains_keys() {
     assert!(providers::build(ProviderKind::ElevenLabs, &VoiceConfig { elevenlabs_key_env: "ONEIRO_TEST_NO_SUCH_KEY".into(), ..c.clone() }, None).is_err());
     assert!(providers::build(ProviderKind::ElevenLabs, &VoiceConfig { elevenlabs_key_env: "ONEIRO_TEST_NO_SUCH_KEY".into(), ..c }, Some("typed")).is_ok());
 }
+
+#[test]
+fn cloning_a_voice_uploads_the_recording_as_multipart_and_returns_the_id() {
+    use oneiro_voice::providers::ElevenLabs;
+    let dir = std::env::temp_dir().join(format!("oneiro_clone_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let wav = dir.join("me.wav");
+    std::fs::write(&wav, vec![7u8; 3000]).unwrap();
+    let (url, rx) = mock_server(200, "application/json", br#"{"voice_id":"abc123"}"#.to_vec());
+    let el = ElevenLabs { key: "k".into(), model: "m".into(), base_url: url };
+    assert_eq!(el.clone_voice("Mi voz", &[wav.clone()]).unwrap(), "abc123");
+    let req = rx.recv().unwrap();
+    assert!(req.contains("/v1/voices/add") && req.to_lowercase().contains("multipart/form-data"), "{}", &req[..req.len().min(300)]);
+    assert!(req.contains("name=\"name\"") && req.contains("Mi voz") && req.contains("filename=\"me.wav\""));
+    assert!(el.clone_voice("", &[wav.clone()]).is_err() && el.clone_voice("x", &[]).is_err());
+    let (url, _rx) = mock_server(401, "application/json", br#"{"detail":{"status":"invalid_api_key","message":"Invalid API key"}}"#.to_vec());
+    let bad = ElevenLabs { key: "k".into(), model: "m".into(), base_url: url };
+    assert!(bad.clone_voice("x", &[wav]).unwrap_err().contains("ElevenLabs"));
+    let _ = std::fs::remove_dir_all(&dir);
+}

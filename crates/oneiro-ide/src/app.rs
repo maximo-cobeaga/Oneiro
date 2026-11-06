@@ -325,6 +325,9 @@ impl App {
         if self.playing {
             self.playing = false;
         } else {
+            if self.audio.after.is_none() && self.ensure_voices(crate::studio::AfterVoices::Play) {
+                return;
+            }
             if self.t >= self.duration() - 1e-6 {
                 self.t = 0.0;
             }
@@ -349,6 +352,9 @@ impl App {
     }
 
     pub fn start_export(&mut self, out: PathBuf, w: u32, h: u32, preview: bool) {
+        if self.audio.after.is_none() && self.ensure_voices(crate::studio::AfterVoices::Export(out.clone(), w, h, preview)) {
+            return;
+        }
         let Some(ws) = &self.ws else { return };
         if !ws.valid {
             self.status = "Fix the errors in the script before rendering".into();
@@ -634,6 +640,7 @@ impl eframe::App for App {
         self.frame_counter += 1;
         self.tick(&ctx);
         self.shortcuts(&ctx);
+        self.audio.ctx = Some(ctx.clone());
         self.poll_voice();
         self.sync_audio();
 

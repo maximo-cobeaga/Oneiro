@@ -6,7 +6,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 pub fn ffmpeg_available() -> bool {
-    Command::new("ffmpeg").arg("-version").stdout(Stdio::null()).stderr(Stdio::null()).status().map(|s| s.success()).unwrap_or(false)
+    let mut c = Command::new("ffmpeg");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000);
+    }
+    c.arg("-version").stdout(Stdio::null()).stderr(Stdio::null()).status().map(|s| s.success()).unwrap_or(false)
 }
 
 /// Decodes raw 16-bit little-endian mono PCM (what several voice APIs return).
@@ -45,7 +51,13 @@ fn decode_with_ffmpeg(path: &Path) -> Result<Audio, String> {
     let dir = std::env::temp_dir().join("oneiro-import");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let tmp = dir.join(format!("out_{}_{}.wav", std::process::id(), crate::unique_id()));
-    let out = Command::new("ffmpeg")
+    let mut ff = Command::new("ffmpeg");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        ff.creation_flags(0x0800_0000);
+    }
+    let out = ff
         .args(["-v", "error", "-nostdin", "-y", "-i"])
         .arg(path)
         .args(["-vn", "-ac", "1", "-ar", &SR.to_string(), "-c:a", "pcm_f32le"])

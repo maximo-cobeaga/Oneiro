@@ -187,6 +187,13 @@ Part rules (the engine checks every one and tells you what is wrong):
 - `head`: drawn WITHOUT eyes, eyebrows or mouth when `face { mode: auto }` (Oneiro draws them at `x`,`y` = where the
   middle of the face is, 0..1 from the top-left of the head; `scale` 0.5-1.5 sizes the face). Use `face { mode: none }`
   only if the head drawing already contains its own face. Draw the head facing the viewer, hair and ears included.
+- BODY MUST CONNECT: the body drawing includes a short NECK (a narrow rounded rectangle rising from the top-center of the
+  torso, about 12% of the body height; the head is drawn over it) and rounded SHOULDERS that reach the full width of the
+  torso at its top edge. Draw the torso so it touches the left, right and top edges of its viewBox (no empty margins), and
+  the head so its chin touches the bottom of its viewBox. The arms hang from the shoulder corners, so a torso narrower than
+  its viewBox leaves them floating. Animals: the snout/muzzle belongs to the head drawing; the mouth is still drawn by
+  Oneiro (`face { mode: auto, x, y }` pointing at the muzzle), so it can talk and show expressions.
+- ALWAYS use `face { mode: auto }`. With `mode: none` the character cannot lip-sync or change expression.
 - `body`: the torso seen from the front, wider than the neck; its bottom edge is the hips.
 - `arm`: ONE arm hanging straight down, a TALL viewBox (for example `0 0 24 100`), hand at the bottom. The same drawing
   is used for both arms. Pivot = the shoulder (top, `pivot: (0.5, 0.08)`).

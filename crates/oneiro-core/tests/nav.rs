@@ -156,3 +156,40 @@ fn any_prop_can_be_made_solid_or_walkable() {
     stool.solid = Some(false);
     assert_eq!(nav::footprints(&set).len(), n0, "a stool set to solid: false is walkable");
 }
+
+#[test]
+fn automatic_close_ups_never_film_through_the_counter_or_a_person() {
+    // Blob behind the counter, Marta on a stool in front of it: the default shot looks toward Blob, across the counter.
+    let ep = scene("  place Marta at diner.stool_2 facing diner.counter
+  place Blob at diner.door
+  camera wide
+  Blob walks_to (0.9, 3.6)
+  cut to close on Marta
+  wait 1s");
+    let sc = &ep.scenes[0];
+    let cam = sc.cameras.last().unwrap().base.pos;
+    let marta = sc.actors.iter().find(|a| a.name == "Marta").unwrap().kin(0.5).pos;
+    let c = counter();
+    assert!(!c.blocks([cam[0], cam[2]], marta), "the camera at {:?} looks through the counter", cam);
+    assert!(dist2([cam[0], cam[2]], marta) > 0.5);
+
+    // A person in the line of sight: the camera steps aside.
+    let ep = scene("  place Marta at diner.door
+  place Blob at diner.door
+  camera wide
+  Marta walks_to (-2.0, -1.0)
+  Blob walks_to (-1.0, -1.0)
+  cut to close on Marta
+  wait 1s");
+    let sc = &ep.scenes[0];
+    let cam = sc.cameras.last().unwrap().base.pos;
+    let blob = sc.actors.iter().find(|a| a.name == "Blob").unwrap().kin(0.5).pos;
+    let marta = sc.actors.iter().find(|a| a.name == "Marta").unwrap().kin(0.5).pos;
+    let d = {
+        let (a, b, p) = ([cam[0], cam[2]], marta, blob);
+        let ab = [b[0] - a[0], b[1] - a[1]];
+        let u = (((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] * ab[0] + ab[1] * ab[1])).clamp(0.0, 1.0);
+        dist2(p, [a[0] + ab[0] * u, a[1] + ab[1] * u])
+    };
+    assert!(d > 0.3, "Blob is {:.2} m from the line of sight", d);
+}

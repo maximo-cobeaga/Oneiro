@@ -40,12 +40,20 @@ pub struct Review {
     pub loud: f32,
 }
 
+/// What to do when automatic voice generation ends.
+#[derive(Clone, Debug)]
+pub enum AfterVoices {
+    Play,
+    Export(PathBuf, u32, u32, bool),
+}
+
 pub enum VoiceMsg {
     Progress { done: usize, total: usize, label: String },
     Script { res: Result<(String, Vec<LineReport>), String>, base: String },
     Line { res: Result<f64, String>, line: u32, rel: String, had_audio: bool, who: String },
     Voices(ProviderKind, Result<Vec<VoiceInfo>, String>),
     Clip(Result<Audio, String>),
+    Cloned { res: Result<String, String>, who: String },
 }
 
 pub struct VoiceJob {
@@ -78,6 +86,15 @@ pub struct AudioState {
     pub session_key: String,
     pub show_settings: bool,
     pub gen_provider: ProviderKind,
+    /// Use each character's own voice (its provider and voice id) instead of one provider for everybody.
+    pub own_voices: bool,
+    /// Generate missing voices by itself before playing or exporting.
+    pub auto_voices: bool,
+    pub after: Option<AfterVoices>,
+    pub clone_name: String,
+    pub clone_files: Vec<PathBuf>,
+    pub clone_for: String,
+    pub ctx: Option<egui::Context>,
     pub job: Option<VoiceJob>,
     pub reports: Vec<LineReport>,
     pub msg: String,
@@ -115,6 +132,13 @@ impl Default for AudioState {
             recording: None,
             review: None,
             gen_provider: cfg.default_provider,
+            own_voices: true,
+            auto_voices: true,
+            after: None,
+            clone_name: String::new(),
+            clone_files: vec![],
+            clone_for: String::new(),
+            ctx: None,
             cfg,
             session_key: String::new(),
             show_settings: false,
@@ -397,14 +421,14 @@ impl App {
         self.audio.job = Some(VoiceJob { rx, started: Instant::now(), done: 0, total: 1, label: label.into() });
     }
 
-    fn generate_all(&mut self, ctx: &egui::Context, force: bool) {
+    pub fn generate_all(&mut self, ctx: &egui::Context, force: bool, only: Vec<String>) {
         if self.audio.job.is_some() {
             return;
         }
         let Some(ws) = &self.ws else { return };
         let (root, project, base) = (ws.root.clone(), ws.project.clone(), ws.script_doc().text.clone());
         let cfg = self.audio.cfg.clone();
-        let opts = GenOptions { force, provider: Some(self.audio.gen_provider), only: vec![], session_key: Some(self.audio.session_key.clone()).filter(|k| !k.is_empty()) };
+        let opts = GenOptions { force, provider: if self.audio.own_voices { None } else { Some(self.audio.gen_provider) }, only, session_key: Some(self.audio.session_key.clone()).filter(|k| !k.is_empty()) };
         let (tx, rx) = channel();
         self.voice_job_spawn(rx, "starting...");
         let c2 = ctx.clone();
@@ -434,13 +458,13 @@ impl App {
             oneiro_voice::next_audio_path(&root, &who, &mut taken)
         });
         let cfg = self.audio.cfg.clone();
-        let force = self.audio.gen_provider;
+        let force = if self.audio.own_voices { None } else { Some(self.audio.gen_provider) };
         let key = Some(self.audio.session_key.clone()).filter(|k| !k.is_empty());
         let (tx, rx) = channel();
         self.voice_job_spawn(rx, &format!("{}: {}", who, short(&text, 40)));
         let c2 = ctx.clone();
         std::thread::spawn(move || {
-            let (kind, req) = oneiro_voice::request_for(&project, &cfg, &who, &emotion, &text, Some(force));
+            let (kind, req) = oneiro_voice::request_for(&project, &cfg, &who, &emotion, &text, force);
             let res = oneiro_voice::build(kind, &cfg, key.as_deref()).and_then(|p| oneiro_voice::synthesize_to(p.as_ref(), &req, &root.join(&rel)));
             let _ = tx.send(VoiceMsg::Line { res, line, rel, had_audio, who });
             c2.request_repaint();
@@ -562,12 +586,27 @@ impl App {
                     }
                     Err(e) => self.audio.msg = e,
                 },
+                VoiceMsg::Cloned { res, who } => match res {
+                    Err(e) => self.audio.msg = e,
+                    Ok(id) => {
+                        self.audio.msg = format!("Voice cloned (id {}).", id);
+                        if !who.is_empty() {
+                            match self.assign_voice(&who, &id) {
+                                Ok(()) => self.audio.msg = format!("Voice cloned and assigned to {}. Press Play to hear it (lines without audio are generated).", who),
+                                Err(e) => self.audio.msg = e,
+                            }
+                        }
+                    }
+                },
                 VoiceMsg::Clip(res) => match res {
                     Ok(a) => self.play_clip(&a),
                     Err(e) => self.audio.msg = e,
                 },
                 VoiceMsg::Progress { .. } => {}
             }
+        }
+        if self.audio.job.is_none() && self.audio.after.is_some() {
+            self.run_after_voices();
         }
     }
 
@@ -731,7 +770,9 @@ impl App {
 
             // ================================================================ dialogue
             egui::CollapsingHeader::new(RichText::new(format!("Dialogue ({} lines)", lines.len())).strong()).default_open(true).show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.checkbox(&mut self.audio.auto_voices, "Generate missing voices automatically when I press Play or Render").on_hover_text("Uses the voice each character has in the Character builder (its provider and voice).");
+                ui.checkbox(&mut self.audio.own_voices, "Use each character's own voice");
+                ui.add_enabled_ui(!self.audio.own_voices, |ui| ui.horizontal(|ui| {
                     ui.label("Voices from");
                     egui::ComboBox::from_id_salt("gen_provider").selected_text(self.audio.gen_provider.label()).width(210.0).show_ui(ui, |ui| {
                         for k in ProviderKind::ALL {
@@ -740,7 +781,7 @@ impl App {
                             }
                         }
                     });
-                });
+                }));
                 let missing = lines.iter().filter(|l| l.audio.as_ref().map_or(true, |p| !root.join(p).exists())).count();
                 ui.horizontal(|ui| {
                     if ui.add_enabled(!busy && missing > 0, egui::Button::new(format!("Generate {} missing", missing))).clicked() {
@@ -971,7 +1012,7 @@ impl App {
                     }
                 }
                 Act::GenerateLine { who, emotion, text, line, rel } => self.generate_line(&ctx, who, emotion, text, line, rel),
-                Act::GenerateAll { force } => self.generate_all(&ctx, force),
+                Act::GenerateAll { force } => self.generate_all(&ctx, force, vec![]),
                 Act::StopMic => self.stop_mic(),
                 Act::CancelRecording => {
                     self.audio.recording = None;
@@ -1007,7 +1048,7 @@ impl App {
         if let Some(name) = self.startup.demo_generate.clone() {
             if f == 5 {
                 self.audio.gen_provider = ProviderKind::from_id(&name).unwrap_or(ProviderKind::Demo);
-                self.generate_all(ctx, false);
+                self.generate_all(ctx, false, vec![]);
             }
             if f > 5 && self.audio.job.is_none() {
                 let missing = oneiro_voice::dialogues(&self.ws.as_ref().map(|w| w.script_doc().text.clone()).unwrap_or_default()).iter().filter(|l| l.audio.is_none()).count();
@@ -1043,6 +1084,7 @@ impl App {
         }
         let mut open = true;
         let mut list: Option<ProviderKind> = None;
+        let mut clone = false;
         let mut save = false;
         egui::Window::new("Voice settings").open(&mut open).default_width(430.0).show(ctx, |ui| {
             ui.label(RichText::new("API keys are never saved to disk: only the name of the environment variable is stored.").weak().small());
@@ -1080,6 +1122,31 @@ impl App {
             if ui.button("List my ElevenLabs voices").clicked() {
                 list = Some(ProviderKind::ElevenLabs);
             }
+            ui.collapsing("Clone a voice (ElevenLabs)", |ui| {
+                ui.label(RichText::new("Upload clean recordings of ONE person who agreed to it (about a minute or more; WAV, MP3...). Needs an ElevenLabs plan with voice cloning.").weak().small());
+                ui.horizontal(|ui| {
+                    ui.label("name");
+                    ui.add(egui::TextEdit::singleline(&mut self.audio.clone_name).desired_width(160.0));
+                });
+                ui.horizontal(|ui| {
+                    if ui.button("Choose recordings...").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().set_title("Recordings of the voice").add_filter("audio", &["wav", "mp3", "m4a", "ogg", "flac"]).pick_files() {
+                            self.audio.clone_files = p;
+                        }
+                    }
+                    ui.label(format!("{} file(s)", self.audio.clone_files.len()));
+                });
+                let who: Vec<String> = self.ws.as_ref().map(|w| w.project.characters.keys().cloned().collect()).unwrap_or_default();
+                egui::ComboBox::from_id_salt("clone_for").selected_text(if self.audio.clone_for.is_empty() { "(only create the voice)".to_string() } else { self.audio.clone_for.clone() }).show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.audio.clone_for, String::new(), "(only create the voice)");
+                    for n in &who {
+                        ui.selectable_value(&mut self.audio.clone_for, n.clone(), format!("use it for {}", n));
+                    }
+                });
+                if ui.add_enabled(self.audio.job.is_none() && !self.audio.clone_files.is_empty() && !self.audio.clone_name.trim().is_empty(), egui::Button::new("Clone voice")).clicked() {
+                    clone = true;
+                }
+            });
             ui.separator();
             ui.label(RichText::new("OpenAI-compatible TTS / local server").strong());
             egui::Grid::new("oa_grid").num_columns(2).show(ui, |ui| {
@@ -1124,6 +1191,9 @@ impl App {
             let ctx2 = ctx.clone();
             self.list_voices(&ctx2, k);
         }
+        if clone {
+            self.start_clone(ctx);
+        }
         if save {
             match self.audio.cfg.save() {
                 Ok(()) => self.audio.msg = format!("Saved {}", oneiro_voice::config::config_path().display()),
@@ -1131,5 +1201,83 @@ impl App {
             }
         }
         self.audio.show_settings = open;
+    }
+}
+
+impl App {
+    /// Characters that have lines without audio and a real voice configured (not `file`).
+    pub fn auto_voice_targets(&self) -> Vec<String> {
+        let Some(ws) = &self.ws else { return vec![] };
+        let mut out: Vec<String> = vec![];
+        for l in oneiro_voice::dialogues(&ws.script_doc().text) {
+            if l.audio.as_ref().map_or(false, |p| ws.root.join(p).exists()) {
+                continue;
+            }
+            let real = ws.project.characters.get(&l.who).and_then(|c| ProviderKind::from_id(&c.voice_provider)).map_or(false, |k| k != ProviderKind::File && k.synthesizes());
+            if real && !out.contains(&l.who) {
+                out.push(l.who);
+            }
+        }
+        out
+    }
+
+    /// If automatic voices are on and some lines have a voice to generate, starts that and remembers what
+    /// to do afterwards. Returns true when the caller must wait.
+    pub fn ensure_voices(&mut self, after: AfterVoices) -> bool {
+        if !self.audio.auto_voices || self.audio.job.is_some() {
+            return false;
+        }
+        let who = self.auto_voice_targets();
+        let Some(ctx) = self.audio.ctx.clone() else { return false };
+        if who.is_empty() {
+            return false;
+        }
+        self.status = format!("Generating the voices of {}...", who.join(", "));
+        self.audio.after = Some(after);
+        self.generate_all(&ctx, false, who);
+        if self.audio.job.is_none() {
+            self.audio.after = None;
+            return false;
+        }
+        true
+    }
+
+    /// Runs what was waiting for the voices.
+    pub fn run_after_voices(&mut self) {
+        let prev = self.audio.auto_voices;
+        self.audio.auto_voices = false; // no second round if some line could not be generated
+        match self.audio.after.take() {
+            Some(AfterVoices::Play) => self.toggle_play(),
+            Some(AfterVoices::Export(out, w, h, preview)) => self.start_export(out, w, h, preview),
+            None => {}
+        }
+        self.audio.auto_voices = prev;
+    }
+}
+
+impl App {
+    fn start_clone(&mut self, ctx: &egui::Context) {
+        let (cfg, name, files, who) = (self.audio.cfg.clone(), self.audio.clone_name.clone(), self.audio.clone_files.clone(), self.audio.clone_for.clone());
+        let key = Some(self.audio.session_key.clone()).filter(|k| !k.is_empty());
+        let (tx, rx) = channel();
+        self.voice_job_spawn(rx, "cloning the voice...");
+        let c2 = ctx.clone();
+        std::thread::spawn(move || {
+            let res = oneiro_voice::providers::clone_voice(&cfg, key.as_deref(), &name, &files);
+            let _ = tx.send(VoiceMsg::Cloned { res, who });
+            c2.request_repaint();
+        });
+    }
+
+    /// Gives a character the ElevenLabs voice `id` (rewrites its .onchar).
+    fn assign_voice(&mut self, who: &str, id: &str) -> Result<(), String> {
+        let ws = self.ws.as_mut().ok_or("no project open")?;
+        let mut def = ws.project.characters.get(who).cloned().ok_or_else(|| format!("no character called {}", who))?;
+        def.voice_provider = "elevenlabs".into();
+        def.voice_id = id.to_string();
+        let path = ws.root.join("library").join("characters").join(format!("{}.onchar", who));
+        std::fs::write(&path, def.to_source()).map_err(|e| format!("{}: {}", path.display(), e))?;
+        ws.reload_project();
+        Ok(())
     }
 }

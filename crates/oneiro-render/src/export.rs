@@ -16,6 +16,11 @@ fn ffmpeg_bin() -> String {
 impl Encoder {
     pub fn start(out: &Path, w: u32, h: u32, fps: u32, audio: Option<&Path>, preview: bool) -> Result<Encoder, String> {
         let mut cmd = Command::new(ffmpeg_bin());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000);
+        }
         cmd.args(["-y", "-hide_banner", "-loglevel", "error"]);
         cmd.args(["-f", "rawvideo", "-pix_fmt", "rgba", "-s", &format!("{}x{}", w, h), "-r", &fps.to_string(), "-i", "-"]);
         if let Some(a) = audio {

@@ -52,7 +52,13 @@ impl Image {
             return Image::from_png(&bytes);
         }
         let tmp = std::env::temp_dir().join(format!("oneiro_cutter_{}_{}.png", std::process::id(), oneiro_unique()));
-        let out = Command::new("ffmpeg")
+        let mut ff = Command::new("ffmpeg");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            ff.creation_flags(0x0800_0000);
+        }
+        let out = ff
             .args(["-v", "error", "-nostdin", "-y", "-i"])
             .arg(path)
             .args(["-frames:v", "1", "-pix_fmt", "rgba"])

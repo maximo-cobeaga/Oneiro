@@ -107,6 +107,11 @@ pub fn run_process(program: &str, args: &[String], env: &[(String, String)], std
     } else {
         Command::new(&resolved)
     };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: never open a console window
+    }
     cmd.args(args).envs(env.iter().map(|(k, v)| (k.as_str(), v.as_str()))).current_dir(workdir).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("could not start '{}': {}", program, e))?;
     let mut stdin = child.stdin.take().ok_or("no stdin")?;

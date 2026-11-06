@@ -76,7 +76,7 @@ const TEMPLATE: &str = "character NAME {
 
 pub fn valid_name(n: &str) -> bool {
     let mut cs = n.chars();
-    matches!(cs.next(), Some(c) if c.is_ascii_uppercase()) && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    matches!(cs.next(), Some(c) if c.is_ascii_alphabetic()) && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 impl BuilderState {
@@ -144,9 +144,9 @@ impl App {
                 }
             });
             ui.label("or");
-            ui.add(egui::TextEdit::singleline(&mut self.builder.new_name).hint_text("NewName").desired_width(90.0));
-            let ok = valid_name(&self.builder.new_name) && !names.contains(&self.builder.new_name);
-            if ui.add_enabled(ok, egui::Button::new("+ New character")).on_hover_text("Name must start with a capital letter").clicked() {
+            ui.add(egui::TextEdit::singleline(&mut self.builder.new_name).hint_text("name").desired_width(90.0));
+            let ok = valid_name(&self.builder.new_name) && !names.contains(&capitalize(&self.builder.new_name));
+            if ui.add_enabled(ok, egui::Button::new("+ New character")).on_hover_text("Letters, digits and _ (starting with a letter). The first letter becomes a capital.").clicked() {
                 start_new = true;
             }
         });
@@ -154,7 +154,7 @@ impl App {
             self.builder.select(self.ws.as_ref(), &n);
         }
         if start_new {
-            let n = self.builder.new_name.clone();
+            let n = capitalize(self.builder.new_name.trim());
             self.builder.start_new(&n);
         }
         ui.separator();
@@ -250,8 +250,9 @@ impl App {
                 ui.label(RichText::new("3D characters are real geometry with cel shading and ink outlines; the cape and tail are simulated in every scene.").weak().small());
             }
             if d.has_svg() {
-                ui.label(RichText::new("This character is drawn from vector parts (library/parts). The blocks below only affect its proportions.").color(Color32::from_rgb(120, 190, 240)).small());
+                ui.label(RichText::new("This character is drawn from parts (library/parts): its head, body and clothes are those drawings, so they have no block controls here. Ask the AI tab to redraw it, or edit the SVG files. Eyes, voice, style and personality still apply.").color(Color32::from_rgb(120, 190, 240)).small());
             }
+            if !d.has_svg() {
             egui::CollapsingHeader::new(RichText::new("Head").strong()).default_open(true).show(ui, |ui| {
                 egui::ComboBox::from_label("shape").selected_text(d.head.kind.clone()).show_ui(ui, |ui| {
                     for k in HEADS {
@@ -281,6 +282,7 @@ impl App {
                     }
                 });
             });
+            }
             egui::CollapsingHeader::new(RichText::new("Eyes").strong()).default_open(true).show(ui, |ui| {
                 egui::ComboBox::from_label("style").selected_text(d.eyes.kind.clone()).show_ui(ui, |ui| {
                     for k in EYES {
@@ -292,6 +294,7 @@ impl App {
                     d.eyes.nums.insert("spacing".into(), sp);
                 }
             });
+            if !d.has_svg() {
             egui::CollapsingHeader::new(RichText::new("Body").strong()).default_open(true).show(ui, |ui| {
                 egui::ComboBox::from_label("build").selected_text(d.body.kind.clone()).show_ui(ui, |ui| {
                     for k in BODIES {
@@ -325,6 +328,7 @@ impl App {
                     }
                 }
             });
+            }
             egui::CollapsingHeader::new(RichText::new("Voice and personality").strong()).default_open(false).show(ui, |ui| {
                 egui::ComboBox::from_label("voice engine").selected_text(d.voice_provider.clone()).show_ui(ui, |ui| {
                     for (id, label) in [
@@ -431,7 +435,7 @@ mod tests {
     #[test]
     fn names_must_start_with_a_capital() {
         assert!(valid_name("Luna") && valid_name("Dr_Who2"));
-        assert!(!valid_name("luna") && !valid_name("") && !valid_name("A B") && !valid_name("1Luna"));
+        assert!(valid_name("luna") && !valid_name("") && !valid_name("A B") && !valid_name("1Luna"));
     }
 
     #[test]
@@ -464,5 +468,14 @@ impl BuilderState {
         self.is_new = is_new;
         self.tex_key = 0;
         self.msg.clear();
+    }
+}
+
+/// "luna" -> "Luna" (character names are capitalized so scripts can tell them from keywords).
+pub fn capitalize(n: &str) -> String {
+    let mut cs = n.chars();
+    match cs.next() {
+        Some(f) => f.to_uppercase().collect::<String>() + cs.as_str(),
+        None => String::new(),
     }
 }
