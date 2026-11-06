@@ -56,3 +56,14 @@ fn model_props_report_missing_files_and_paths_outside_the_project() {
     assert!(load("a: library.props.model { at: (1, 1) }").iter().any(|m| m.starts_with("E1121")));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_showcase_compiles_cleanly() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/showcase").canonicalize().unwrap();
+    let mut d = vec![];
+    let p = Project::load(&root, &mut d);
+    let (ep, d2) = oneiro_core::compile(&p, &root.join("script.onr"), &oneiro_core::lock::Lock::default());
+    d.extend(d2);
+    assert!(d.is_empty(), "{:?}", d.iter().map(|x| x.render()).collect::<Vec<_>>());
+    assert_eq!(ep.scenes[0].transitions.len(), 3);
+}

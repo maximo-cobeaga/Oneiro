@@ -2,6 +2,7 @@
 
 
 mod ai_cmds;
+mod doctor_cmd;
 mod new_cmd;
 mod audio_cmds;
 mod cut_cmds;
@@ -21,6 +22,7 @@ oneiro 0.1 - a language and studio for animated series
 
 USAGE:
   oneiro new <dir> [--name NAME]   scaffold a project that renders out of the box
+  oneiro doctor                      what works on this machine (ffmpeg, GPU, voices, AI tools)
   oneiro check <project|script.onr> [--json]
   oneiro render <project|script.onr> [-o out.mp4] [--preview] [--res WxH] [--fps N]
                 [--no-audio] [--hash] [--png-dir DIR] [--no-write] [--3d cpu|gpu|auto]
@@ -167,6 +169,7 @@ fn main() -> ExitCode {
     let rest = &args[1..];
     let result = match cmd.as_str() {
         "new" => new_cmd::cmd_new(rest),
+        "doctor" => doctor_cmd::cmd_doctor(rest),
         "check" => cmd_check(rest),
         "render" => cmd_render(rest),
         "still" => cmd_still(rest),

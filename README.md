@@ -23,7 +23,7 @@ scene 1 "Late order" in diner {
 }
 ```
 
-## Status: Phases 0-8 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter, 3D toon + physics, polish)
+## Status: Phases 0-13 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter, 3D toon + physics, polish, 3D world)
 
 - **Language + CLI:** parser, solver, CPU renderer, lipsync and mp4 export in the `cutout_2d` (South Park-like) style, on CPU only.
 - **Oneiro Studio (IDE):** live viewport, script editor with diagnostics, timeline, library, block-based character builder,
@@ -39,7 +39,9 @@ scene 1 "Late order" in diner {
 
 - **3D toon style:** characters as real 3D geometry with cel shading, ink outlines and simulated cloth capes and springy tails; a GPU (wgpu) renderer with an automatic CPU fallback. See [docs/10-toon3d.md](docs/10-toon3d.md).
 
-Next: polish, sets in 3D, imported models and more physics. See [docs/04-roadmap.md](docs/04-roadmap.md).
+- **Polish and 3D world:** transitions, the `ink` style, walking around furniture, `oneiro new`, 3D props, imported `.obj` models, paper-doll characters and `oneiro doctor`. See [docs/11-polish.md](docs/11-polish.md) and [docs/12-world.md](docs/12-world.md).
+
+New here? Read [QUICKSTART.md](QUICKSTART.md).
 
 ![Oneiro Studio](docs/img/ide-overview.png)
 

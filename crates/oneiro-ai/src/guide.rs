@@ -80,6 +80,7 @@ scene 1 "Late order" in diner {
   [fade_in 2s] [fade_out 2s] [once]` starts a looping track from library/music/NAME.wav (a new `music` crossfades the
   previous one); `music stop [fade_out 2s]` ends it. Music ducks automatically under dialogue. Use only sounds from the
   list below; when you need one that is missing, create it first (the `generate_sound` tool, or `oneiro sound`).
+- Props can be made 3D (`look: toon_3d` on a prop or the whole set), solid (`solid: true`: characters walk around it) or an imported OBJ (`library.props.model { model: "library/models/x.obj", height: 1 }`). Only touch these when asked.
 - Styles are per character: `style default: cutout_2d` sets the episode's look, and `use character Blob style rubber_hose`
   draws that one character differently (cutout_2d, rubber_hose, clay, ink, toon_3d). Different styles can share a scene. Only change
   styles when the user asks for a look.

@@ -184,3 +184,8 @@ imported models or textures.
 Done: walking around furniture (fixes the waiter inside the bar), `transition` between shots (dissolve, fade_black, fade_white,
 wipe_left, wipe_right), the `ink` style, `oneiro new`, and soft 3D character shadows. Details, tests (187 green) and limitations
 in [11-polish.md](11-polish.md).
+
+## Phases 9-13 results (3D world)
+
+Phase 9 solid props and time-of-day shadows, 10 3D props, 11 imported OBJ models, 12 paper-doll characters in `toon_3d`,
+13 `oneiro doctor`, `examples/showcase` and QUICKSTART. Details and limitations in [12-world.md](12-world.md).
