@@ -9,7 +9,7 @@ const WIDE: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1600
 const TALL: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 200\"><rect x=\"44\" y=\"80\" width=\"12\" height=\"120\" fill=\"#8A5A34\"/><circle cx=\"50\" cy=\"60\" r=\"45\" fill=\"#2FA85A\"/><circle cx=\"30\" cy=\"90\" r=\"25\" fill=\"#38B764\"/></svg>";
 
 fn source() -> String {
-    "set lagoon {\n  kind: open\n  size: 14m x 10m\n  sky: [#4CC3FF, #FFF3C9]\n  ground: #F0D58C\n  backdrops {\n    north: \"backdrop_north\"\n  }\n  anchors {\n    start: (-4.0, -2.0)\n    center: (0.0, 0.0)\n  }\n  sprites {\n    tree_1: { image: \"sprite_tree\", at: (-5.0, 3.0), height: 4.0, anim: sway }\n    tree_2: { image: \"sprite_tree\", at: (5.0, 3.5), height: 3.5, anim: sway, flip: true }\n  }\n}".to_string()
+    "set lagoon {\n  kind: open\n  size: 14m x 10m\n  sky: [#4CC3FF, #FFF3C9]\n  ground: #F0D58C\n  backdrops {\n    north: \"backdrop_north\"\n  }\n  anchors {\n    start: (-4.0, -2.0)\n    center: (0.0, 0.0)\n  }\n  props {\n    h: library.props.house { at: (3.0, 4.0) }\n    t: library.props.tree { at: (-3.0, 4.0) }\n    c: library.props.car { at: (0.0, -4.0) }\n  }\n  solids {\n    hill: { shape: sphere, at: (0.0, 20.0), size: (20.0, 8.0, 10.0), color: #6CBF84 }\n    well: { shape: cylinder, at: (0.0, 1.0), size: (1.2, 0.9, 1.2), color: #B5B9C4 }\n  }\n  sprites {\n    tree_1: { image: \"sprite_tree\", at: (-5.0, 3.0), height: 4.0, anim: sway }\n    tree_2: { image: \"sprite_tree\", at: (5.0, 3.5), height: 3.5, anim: sway, flip: true }\n  }\n}".to_string()
 }
 
 fn svgs() -> BTreeMap<String, String> {
@@ -39,7 +39,9 @@ fn bad_sets_are_rejected_with_reasons() {
     let mut text = svgs();
     text.insert("sprite_tree".into(), "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"><text>hi</text></svg>".into());
     assert!(!why(source(), text).is_empty());
-    assert!(why(source().replace("backdrops {\n    north: \"backdrop_north\"\n  }", ""), svgs()).contains("backdrops"));
+    let tiny = "set s {\n  kind: open\n  solids {\n    a: { shape: box, at: (0.0, 0.0), size: (1.0, 1.0, 1.0) }\n  }\n}".to_string();
+    assert!(why(tiny, BTreeMap::new()).contains("only 1 things"));
+    assert!(why(source().replace("shape: sphere", "shape: donut"), svgs()).contains("unknown shape"));
 }
 
 #[test]

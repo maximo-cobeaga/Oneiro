@@ -207,3 +207,7 @@ Open sets with painted backdrops on four sides and animated sprites, an AI mode 
 voice cloning and automatic voices, drawn-character fixes (face decal, neck/shoulders), camera occlusion avoidance, no terminal
 windows. See [14-open-sets.md](14-open-sets.md). **Not verified:** voice cloning against a real ElevenLabs account; AI-drawn
 scenarios with a real model (tested with a mock provider); how AI-drawn characters from the user's session look after the face fix.
+
+## Phase 17 results (3D worlds)
+
+Open 3D sets: 14 stock props, `solids` primitives, village example, AI scenery built from 3D pieces, new set templates in the IDE. See [15-3d-worlds.md](15-3d-worlds.md). 216 tests. **Not verified:** AI-built scenery with a real model; large scenes (hundreds of pieces) for speed.

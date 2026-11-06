@@ -45,6 +45,8 @@ scene 1 "Late order" in diner {
 
 - **Open sets:** scenarios that are not rooms: painted backdrops on four sides plus animated sprites, painted by you or by the AI (see [docs/14-open-sets.md](docs/14-open-sets.md)). Interface in English and Spanish.
 
+- **3D worlds without rooms:** open sets built from stock 3D props (houses, trees, cars, furniture...) and primitive solids in the toon style, from any camera side (see [docs/15-3d-worlds.md](docs/15-3d-worlds.md), example `examples/village`).
+
 New here? Read [QUICKSTART.md](QUICKSTART.md); to test every tool with your own story, follow [docs/13-first-story.md](docs/13-first-story.md).
 
 ![Oneiro Studio](docs/img/ide-overview.png)

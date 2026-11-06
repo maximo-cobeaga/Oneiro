@@ -12,7 +12,7 @@ fn col(c: Rgb) -> V3 {
 
 /// Props that have a 3D version.
 pub fn supported(pr: &PropInst) -> bool {
-    pr.wall.is_none() && (matches!(pr.kind.as_str(), "counter" | "stool" | "table" | "pie_case") || (pr.kind == "model" && pr.mesh.is_some()))
+    pr.wall.is_none() && (matches!(pr.kind.as_str(), "counter" | "stool" | "table" | "pie_case") || crate::stock::stock(&pr.kind).is_some() || (pr.kind == "model" && pr.mesh.is_some()))
 }
 
 /// World-space mesh of one piece of a prop.
@@ -53,6 +53,11 @@ pub fn prop_mesh(set: &SetDef, pr: &PropInst, piece: usize) -> Mesh {
             for (k, c) in [Rgb(214, 160, 90), Rgb(196, 56, 70), Rgb(240, 222, 150)].into_iter().enumerate() {
                 let o = (k as f32 - 1.0) * w * 0.3;
                 m.cylinder([at[0] + cy * o, y0 + 0.08, at[1] - sy * o], 0.06, 0.12, col(c));
+            }
+        }
+        k if crate::stock::stock(k).is_some() => {
+            if let Some(sm) = crate::stock::stock_mesh(pr) {
+                m = sm;
             }
         }
         "model" => {

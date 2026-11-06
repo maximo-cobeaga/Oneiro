@@ -17,7 +17,10 @@ pub const PLANNED_STYLES: &[&str] = &[];
 /// Parts of a vector (SVG) character, in the order they must be provided.
 pub const SVG_PARTS: &[&str] = &["head", "body", "arm", "leg"];
 
-pub const PROP_KINDS: &[&str] = &["counter", "stool", "table", "wall_clock", "window", "door", "pie_case", "model"];
+pub const PROP_KINDS: &[&str] = &["counter", "stool", "table", "wall_clock", "window", "door", "pie_case", "model", "tree", "pine", "bush", "rock", "house", "fence", "lamp_post", "bench", "sofa", "bed", "bookshelf", "tv", "car", "rug"];
+
+/// Props that exist only as 3D geometry (always drawn with the toon 3D look).
+pub const STOCK_3D_PROPS: &[&str] = &["tree", "pine", "bush", "rock", "house", "fence", "lamp_post", "bench", "sofa", "bed", "bookshelf", "tv", "car", "rug"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Slot {

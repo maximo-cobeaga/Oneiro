@@ -11,6 +11,7 @@ pub mod build;
 pub mod gpu;
 pub mod mesh;
 pub mod props;
+pub mod stock;
 pub mod raster;
 
 pub use build::{character_mesh, Built};

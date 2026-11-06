@@ -260,6 +260,61 @@ impl Mesh {
         }
     }
 
+    /// A flat-shaded convex polygon whose front faces away from `inside` (a point inside the solid).
+    pub fn flat_poly(&mut self, pts: &[V3], inside: V3, color: V3) {
+        if pts.len() < 3 {
+            return;
+        }
+        let mut n = norm(cross(sub(pts[1], pts[0]), sub(pts[2], pts[0])));
+        let flip = dot(n, sub(pts[0], inside)) < 0.0;
+        if flip {
+            n = mul(n, -1.0);
+        }
+        let base = self.v.len() as u32;
+        for p in pts {
+            self.v.push(Vtx { p: *p, n, c: color });
+        }
+        for k in 1..pts.len() as u32 - 1 {
+            if flip {
+                self.i.extend_from_slice(&[base, base + k + 1, base + k]);
+            } else {
+                self.i.extend_from_slice(&[base, base + k, base + k + 1]);
+            }
+        }
+    }
+
+    /// A gabled roof: base `size.0 x size.2` at height `y0`, ridge along the local x axis `size.1` above it.
+    pub fn gable_roof(&mut self, c: [f32; 2], y0: f32, size: [f32; 3], yaw: f32, color: V3) {
+        let r = [yaw.cos(), 0.0, -yaw.sin()];
+        let f = [yaw.sin(), 0.0, yaw.cos()];
+        let at = |x: f32, y: f32, z: f32| add([c[0], y0 + y, c[1]], add(mul(r, x), mul(f, z)));
+        let (hw, hd) = (size[0] / 2.0, size[2] / 2.0);
+        let inside = at(0.0, size[1] * 0.3, 0.0);
+        let (a, b, cc, d) = (at(-hw, 0.0, -hd), at(hw, 0.0, -hd), at(hw, 0.0, hd), at(-hw, 0.0, hd));
+        let (r0, r1) = (at(-hw, size[1], 0.0), at(hw, size[1], 0.0));
+        self.flat_poly(&[a, b, r1, r0], inside, color);
+        self.flat_poly(&[d, cc, r1, r0], inside, color);
+        let side = mulc(color, 0.86);
+        self.flat_poly(&[a, d, r0], inside, side);
+        self.flat_poly(&[b, cc, r1], inside, side);
+        self.flat_poly(&[a, b, cc, d], inside, mulc(color, 0.6));
+    }
+
+    /// A four-sided pyramid.
+    pub fn pyramid(&mut self, c: [f32; 2], y0: f32, size: [f32; 3], yaw: f32, color: V3) {
+        let r = [yaw.cos(), 0.0, -yaw.sin()];
+        let f = [yaw.sin(), 0.0, yaw.cos()];
+        let at = |x: f32, y: f32, z: f32| add([c[0], y0 + y, c[1]], add(mul(r, x), mul(f, z)));
+        let (hw, hd) = (size[0] / 2.0, size[2] / 2.0);
+        let inside = at(0.0, size[1] * 0.25, 0.0);
+        let apex = at(0.0, size[1], 0.0);
+        let cs = [at(-hw, 0.0, -hd), at(hw, 0.0, -hd), at(hw, 0.0, hd), at(-hw, 0.0, hd)];
+        for k in 0..4 {
+            self.flat_poly(&[cs[k], cs[(k + 1) % 4], apex], inside, mulc(color, if k % 2 == 0 { 1.0 } else { 0.84 }));
+        }
+        self.flat_poly(&cs, inside, mulc(color, 0.6));
+    }
+
     /// A thin double-sided sheet through a `rows x cols` grid of points (cloth). `thickness` pushes the two
     /// faces apart so that the outline pass has a hull to grow.
     pub fn sheet(&mut self, pts: &[V3], rows: usize, cols: usize, thickness: f32, color: V3) {
@@ -306,4 +361,8 @@ impl Mesh {
 
 fn orient_pole(lat0: f32, lat1: f32, j: usize, nv: usize) -> bool {
     (j == 0 && lat0.abs() >= 89.9) || (j == nv && lat1.abs() >= 89.9)
+}
+
+fn mulc(c: V3, k: f32) -> V3 {
+    [(c[0] * k).min(1.0), (c[1] * k).min(1.0), (c[2] * k).min(1.0)]
 }

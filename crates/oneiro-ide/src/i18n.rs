@@ -330,6 +330,8 @@ const ES: &[(&str, &str)] = &[
     ("● Record motion", "● Grabar movimiento"),
     // Added with the start screen, dialogs and scenario tools.
     ("(choose)", "(elegir)"),
+    ("Open field (sky and grass, no walls, build your own 3D world)", "Campo abierto (cielo y pasto, sin paredes, arma tu propio mundo 3D)"),
+    ("Village (houses, trees, a well and hills in 3D)", "Aldea (casas, árboles, un pozo y colinas en 3D)"),
     ("API key", "Clave de API"),
     ("paste your key here", "pega tu clave aquí"),
     ("Save key", "Guardar clave"),

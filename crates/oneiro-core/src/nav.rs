@@ -76,7 +76,12 @@ impl Obb {
 
 /// Footprints of the props people cannot walk through.
 pub fn footprints(set: &SetDef) -> Vec<(String, Obb)> {
-    set.props.iter().filter_map(|p| footprint(p).map(|o| (p.name.clone(), o))).collect()
+    let mut out: Vec<(String, Obb)> = set.props.iter().filter_map(|p| footprint(p).map(|o| (p.name.clone(), o))).collect();
+    for s in set.solids.iter().filter(|s| s.solid) {
+        let (hw, hd) = if s.shape == "cylinder" { (s.size[0] / 2.0, s.size[0] / 2.0) } else { (s.size[0] / 2.0, s.size[2] / 2.0) };
+        out.push((s.name.clone(), Obb { c: s.at, hw, hd, yaw: s.yaw }));
+    }
+    out
 }
 
 pub fn footprint_of(p: &PropInst) -> Option<Obb> {
@@ -95,6 +100,15 @@ fn footprint(p: &PropInst) -> Option<Obb> {
         "counter" => (p.w.unwrap_or(5.0), p.d.unwrap_or(0.8) + 0.14),
         "table" => (p.w.unwrap_or(1.2), p.d.unwrap_or(0.8)),
         "stool" => (p.w.unwrap_or(0.56) * 0.9, p.w.unwrap_or(0.56) * 0.9),
+        "house" => (p.w.unwrap_or(5.0), p.d.unwrap_or(4.0)),
+        "car" => (p.w.unwrap_or(1.8), p.d.unwrap_or(4.2)),
+        "sofa" => (p.w.unwrap_or(2.0), p.d.unwrap_or(0.9)),
+        "bed" => (p.w.unwrap_or(1.5), p.d.unwrap_or(2.0)),
+        "bookshelf" => (p.w.unwrap_or(1.2), p.d.unwrap_or(0.35)),
+        "bench" => (p.w.unwrap_or(1.6), p.d.unwrap_or(0.55)),
+        "rock" => (p.w.unwrap_or(1.2) * 0.8, p.d.unwrap_or(0.9) * 0.8),
+        "tree" | "pine" => (0.5, 0.5),
+        "lamp_post" => (0.35, 0.35),
         // Anything else only blocks when asked to (`solid: true`), with its own width and depth.
         _ if p.solid == Some(true) => (p.w.unwrap_or(0.8), p.d.unwrap_or(0.6)),
         _ => return None,
