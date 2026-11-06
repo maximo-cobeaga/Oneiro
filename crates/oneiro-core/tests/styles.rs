@@ -98,9 +98,9 @@ fn unknown_and_planned_styles_are_reported_with_help() {
     let e = d.iter().find(|x| x.code == "E2301").expect("E2301");
     assert!(e.message.contains("unknown style 'rubberhose'") && e.suggestion.as_deref().unwrap_or("").contains("rubber_hose"), "{:?}", e);
 
-    let (_, d) = compile(&p, &base.replacen("style default: cutout_2d", "style default: ink", 1));
+    let (_, d) = compile(&p, &base.replacen("style default: cutout_2d", "style default: watercolor", 1));
     let e = d.iter().find(|x| x.code == "E2301").expect("E2301");
-    assert!(e.message.contains("planned") && e.suggestion.as_deref().unwrap_or("").contains("clay"), "{:?}", e);
+    assert!(e.message.contains("unknown style") && e.suggestion.as_deref().unwrap_or("").contains("clay"), "{:?}", e);
 
     // The same check applies to a style written in a .onchar
     let bad = "character Zed {\n  rig: library.rigs.biped_cutout\n  style: clayy\n}\n";

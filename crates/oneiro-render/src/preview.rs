@@ -105,6 +105,7 @@ pub fn character_portrait(def: &CharacterDef, opts: &PortraitOpts, w: u32, h: u3
         dur: 2000.0,
         actors: vec![tl],
         cameras: single_camera(pose, "portrait", 2000.0),
+        transitions: vec![],
         spans: vec![],
     };
     let ep = episode_with(scene, w, h);
@@ -135,6 +136,7 @@ pub fn set_preview(set: &SetDef, w: u32, h: u32) -> Pixmap {
         dur: 10.0,
         actors: vec![],
         cameras: single_camera(pose, "preview", 10.0),
+        transitions: vec![],
         spans: vec![],
     };
     let ep = episode_with(scene, w, h);

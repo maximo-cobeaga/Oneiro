@@ -149,3 +149,8 @@ error[E1042] script.onr:20:3  unknown verb 'walk_to'
 | W3xxx | Warnings (W3001 pinned shot no longer matches the script) |
 
 `oneiro check --json` prints them as a JSON array for AI consumption.
+
+## Transitions (Phase 8)
+
+`transition KIND [for DUR]` on the line before a `camera` or `cut to`: `dissolve`, `fade_black`, `fade_white`, `wipe_left`,
+`wipe_right`. See [11-polish.md](11-polish.md).

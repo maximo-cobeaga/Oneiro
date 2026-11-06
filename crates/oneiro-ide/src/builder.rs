@@ -233,7 +233,7 @@ impl App {
                     }
                 });
             });
-            ui.label(RichText::new("cutout_2d: paper cutout - rubber_hose: 1930s noodle limbs - clay: stop-motion plasticine. A script can override it with `use character X style Y`.").weak().small());
+            ui.label(RichText::new("cutout_2d: paper cutout - rubber_hose: 1930s noodle limbs - clay: stop-motion plasticine - ink: pen drawing - toon_3d: real 3D. A script can override it with `use character X style Y`.").weak().small());
             if d.style == "toon_3d" {
                 for (key, label, default) in [("cape", "cape (cloth physics)", Rgb(192, 32, 48)), ("tail", "tail (spring physics)", Rgb(224, 120, 42))] {
                     let slot = if key == "cape" { &mut d.toon3d.cape } else { &mut d.toon3d.tail };

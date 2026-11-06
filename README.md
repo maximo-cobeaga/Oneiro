@@ -23,7 +23,7 @@ scene 1 "Late order" in diner {
 }
 ```
 
-## Status: Phases 0-7 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter, 3D toon + physics)
+## Status: Phases 0-8 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter, 3D toon + physics, polish)
 
 - **Language + CLI:** parser, solver, CPU renderer, lipsync and mp4 export in the `cutout_2d` (South Park-like) style, on CPU only.
 - **Oneiro Studio (IDE):** live viewport, script editor with diagnostics, timeline, library, block-based character builder,

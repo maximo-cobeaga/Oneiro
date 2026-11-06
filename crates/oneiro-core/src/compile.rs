@@ -6,6 +6,7 @@ use crate::catalog::*;
 use crate::defs::*;
 use crate::lock::Lock;
 use crate::math::*;
+use crate::nav;
 use crate::project::Project;
 use crate::timeline::*;
 use oneiro_audio::{lipsync, read_wav};
@@ -78,6 +79,14 @@ impl StateLog {
     }
 }
 
+/// A blend across the camera cut at `t` (scene time): the window is `t - dur/2 .. t + dur/2`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Transition {
+    pub t: f64,
+    pub dur: f64,
+    pub kind: String,
+}
+
 pub struct Scene {
     pub number: u32,
     pub title: String,
@@ -88,6 +97,8 @@ pub struct Scene {
     pub dur: f64,
     pub actors: Vec<ActorTimeline>,
     pub cameras: Vec<CameraSeg>,
+    /// Blends across camera cuts (`transition dissolve for 1s`), in scene time.
+    pub transitions: Vec<Transition>,
     /// Time span of every top-level statement (links script lines to the timeline).
     pub spans: Vec<StmtSpan>,
 }
@@ -111,6 +122,7 @@ fn stmt_label(s: &ast::Stmt) -> String {
         ast::StmtKind::Sfx(x) => format!("sfx {}", x.name),
         ast::StmtKind::Music(m) => format!("music {}", m.name),
         ast::StmtKind::Wait(w) => format!("wait {}s", w),
+        ast::StmtKind::Transition { kind, .. } => format!("transition {}", kind),
         ast::StmtKind::Together(v) => {
             let inner: Vec<String> = v.iter().map(stmt_label).collect();
             inner.join(" & ")
@@ -125,6 +137,24 @@ impl Scene {
             Some(seg) => seg.pose_at(t, &self.actors),
             None => CameraPose { pos: [0.0, 1.9, -6.0], target: [0.0, 1.0, 0.0], fov: 49.0, roll: 0.0 },
         }
+    }
+
+    /// When `lt` falls inside a transition window: (outgoing pose, incoming pose, mix 0..1, kind). The
+    /// outgoing shot is held at its last pose and the incoming one at its first, so both are defined
+    /// on either side of the cut.
+    pub fn transition_at(&self, lt: f64) -> Option<(CameraPose, CameraPose, f64, &str)> {
+        for tr in &self.transitions {
+            let (start, end) = (tr.t - tr.dur / 2.0, tr.t + tr.dur / 2.0);
+            if lt <= start || lt >= end {
+                continue;
+            }
+            let out = self.cameras.iter().rev().find(|c| c.t0 < tr.t - 1e-6)?;
+            let inc = self.cameras.iter().rev().find(|c| c.t0 <= tr.t + 1e-6)?;
+            let pose_out = out.pose_at(lt.min(tr.t - 1e-3), &self.actors);
+            let pose_in = inc.pose_at(lt.max(tr.t), &self.actors);
+            return Some((pose_out, pose_in, (lt - start) / tr.dur, tr.kind.as_str()));
+        }
+        None
     }
 
     pub fn frames_at(&self, t: f64) -> Vec<ActorFrame> {
@@ -249,6 +279,9 @@ struct SceneB {
     cursor: f64,
     cams: Vec<PendingCam>,
     cam_count: u32,
+    /// A `transition` waiting for the next camera change: (kind, duration, where it was written).
+    pending_tr: Option<(String, f64, Pos)>,
+    transitions: Vec<Transition>,
 }
 
 struct Cx<'a> {
@@ -464,6 +497,8 @@ impl<'a> Cx<'a> {
             cursor: 0.0,
             cams: vec![],
             cam_count: 0,
+            pending_tr: None,
+            transitions: vec![],
         };
         let mut spans: Vec<StmtSpan> = Vec::new();
         for s in &sc.stmts {
@@ -515,6 +550,10 @@ impl<'a> Cx<'a> {
         }
 
         let cameras = self.solve_cameras(&sb, &actors, dur);
+        if let Some((_, _, p)) = sb.pending_tr.take() {
+            self.diags.push(Diagnostic::warning("W1060", &self.label, p, "this transition has no camera change after it, so it does nothing"));
+        }
+        let sb_transitions = std::mem::take(&mut sb.transitions);
         Scene {
             number: sc.number,
             title: sc.title.clone(),
@@ -524,6 +563,7 @@ impl<'a> Cx<'a> {
             dur,
             actors,
             cameras,
+            transitions: sb_transitions,
             spans,
         }
     }
@@ -638,6 +678,9 @@ impl<'a> Cx<'a> {
                 sb.cam_count += 1;
                 let index = sb.cam_count;
                 sb.cams.push(PendingCam { t: start, stmt: c.clone(), pos, index });
+                if let Some((kind, dur, _)) = sb.pending_tr.take() {
+                    sb.transitions.push(Transition { t: start, dur, kind });
+                }
                 0.0
             }
             ast::StmtKind::Action(a) => self.action(sb, a, pos, start),
@@ -688,6 +731,22 @@ impl<'a> Cx<'a> {
                 0.0
             }
             ast::StmtKind::Wait(w) => *w,
+            ast::StmtKind::Transition { kind, dur } => {
+                if !TRANSITIONS.contains(&kind.as_str()) {
+                    self.err(
+                        "E1060",
+                        pos,
+                        format!("unknown transition '{}'", kind),
+                        Some(format!("{} (available: {})", did_you_mean(kind, TRANSITIONS.iter().copied()), TRANSITIONS.join(", "))),
+                    );
+                } else {
+                    if let Some((_, _, p)) = sb.pending_tr.take() {
+                        self.diags.push(Diagnostic::warning("W1060", &self.label, p, "this transition is replaced by a later one before any camera change"));
+                    }
+                    sb.pending_tr = Some((kind.clone(), dur.unwrap_or(1.0).clamp(0.1, 5.0), pos));
+                }
+                0.0
+            }
             ast::StmtKind::Together(v) => {
                 let mut m = 0.0f64;
                 for c in v {
@@ -904,7 +963,12 @@ impl<'a> Cx<'a> {
             let a = [ap[0], ap[2]];
             let u = norm2([-a[0], -a[1]]);
             let u = if a[0].abs() + a[1].abs() < 1e-6 { [0.0, -1.0] } else { u };
-            xz = [a[0] + u[0] * 0.75, a[1] + u[1] * 0.75];
+            let obs = nav::footprints(&sb.set);
+            xz = match (nav::obstacle_at(&obs, a, 0.3), self.chars.get(&p.entity)) {
+                // In front of the prop, a body width away from it, toward the middle of the room.
+                (Some(i), Some(def)) => nav::standoff(&obs[i].1, a, [0.0, 0.0], nav::radius(def)),
+                _ => [a[0] + u[0] * 0.75, a[1] + u[1] * 0.75],
+            };
             default_yaw = Some(yaw_to(xz, a));
         }
         let mut xz = [xz[0].clamp(-hw, hw), xz[1].clamp(-hd, hd)];
@@ -1147,12 +1211,20 @@ impl<'a> Cx<'a> {
             (a.pos, a.seated)
         };
         let mut exclude: Option<String> = None;
+        let obs = nav::footprints(&sb.set);
+        let body_r = nav::radius(&sb.actors[who].tl.def);
         let mut dest = match tgt {
             Tgt::Anchor { pos, solid, .. } => {
                 let ap = [pos[0], pos[2]];
                 if *solid && !ignore_solid {
-                    let u = norm2([ap[0] - cur[0], ap[1] - cur[1]]);
-                    [ap[0] - u[0] * 0.75, ap[1] - u[1] * 0.75]
+                    // In front of the prop, at a distance that depends on how wide the character is.
+                    match nav::obstacle_at(&obs, ap, 0.3) {
+                        Some(i) => nav::standoff(&obs[i].1, ap, cur, body_r),
+                        None => {
+                            let u = norm2([ap[0] - cur[0], ap[1] - cur[1]]);
+                            [ap[0] - u[0] * 0.75, ap[1] - u[1] * 0.75]
+                        }
+                    }
                 } else {
                     ap
                 }
@@ -1180,6 +1252,25 @@ impl<'a> Cx<'a> {
         let hd = sb.set.depth / 2.0 - 0.3;
         dest = [dest[0].clamp(-hw, hw), dest[1].clamp(-hd, hd)];
 
+        // Furniture: never end up inside it, and go around it on the way. An obstacle that contains the
+        // target itself (the stool someone sits on, the counter someone leans on) is not an obstacle.
+        let target_pt = match tgt {
+            Tgt::Anchor { pos, .. } => Some([pos[0], pos[2]]),
+            _ => None,
+        };
+        let inflated: Vec<nav::Obb> = obs
+            .iter()
+            .filter(|(_, o)| target_pt.map_or(true, |p| !o.inflate(0.3).contains(p)))
+            .map(|(_, o)| o.inflate(body_r))
+            .collect();
+        for _ in 0..2 {
+            for o in &inflated {
+                dest = nav::push_out(o, dest);
+            }
+        }
+        dest = [dest[0].clamp(-hw, hw), dest[1].clamp(-hd, hd)];
+        let path = nav::plan(cur, dest, &inflated, (hw, hd));
+
         let mut t = start;
         let a = sb.actors.get_mut(who).unwrap();
         if seated {
@@ -1187,18 +1278,33 @@ impl<'a> Cx<'a> {
             a.seated = false;
             t += 0.5;
         }
-        let d = dist2(cur, dest);
-        if d > 0.05 {
-            let want = yaw_to(cur, dest);
-            let diff = angle_diff(want, a.yaw).abs();
-            let tt = (diff / 3.5).clamp(0.12, 0.6);
-            push_turn(a, t, want, tt);
-            t += tt;
+        // The way there, possibly around furniture: one straight segment per waypoint.
+        let mut points = vec![cur];
+        points.extend(path.iter().copied());
+        let total: f64 = points.windows(2).map(|w| dist2(w[0], w[1])).sum();
+        if total > 0.05 {
             let speed = if run { 3.0 } else { 1.25 } * speed_mul;
-            let dur = dur_override.unwrap_or(d / speed).max(0.3);
-            a.tl.moves.push(MoveSeg { t0: t, t1: t + dur, from: cur, to: dest, run });
-            a.pos = dest;
-            t += dur;
+            let dur_total = dur_override.unwrap_or(total / speed).max(0.3);
+            for (k, w) in points.windows(2).enumerate() {
+                let seg_len = dist2(w[0], w[1]);
+                if seg_len < 0.02 {
+                    continue;
+                }
+                let want = yaw_to(w[0], w[1]);
+                let seg_dur = (dur_total * seg_len / total).max(0.1);
+                if k == 0 {
+                    let diff = angle_diff(want, a.yaw).abs();
+                    let tt = (diff / 3.5).clamp(0.12, 0.6);
+                    push_turn(a, t, want, tt);
+                    t += tt;
+                } else {
+                    // Corners are turned on the move.
+                    push_turn(a, t, want, (seg_dur * 0.5).min(0.3));
+                }
+                a.tl.moves.push(MoveSeg { t0: t, t1: t + seg_dur, from: w[0], to: w[1], run });
+                a.pos = w[1];
+                t += seg_dur;
+            }
         }
         let final_yaw = match tgt {
             Tgt::Anchor { facing: Some(y), .. } => Some(*y),

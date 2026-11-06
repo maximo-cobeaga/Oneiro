@@ -235,3 +235,15 @@ fn clay_characters_are_drawn_without_outlines() {
     let (with, without) = (ink(1.0), ink(0.0));
     assert!(with > without * 2 && with - without > 800, "outlines on: {} ink pixels, off: {} (only the face lines remain)", with, without);
 }
+
+#[test]
+fn ink_reinks_a_character_with_heavy_line_and_few_tones() {
+    let p = project();
+    let plain = Renderer::new(&episode(&p, &solo("Marta", "cutout_2d", "")), 320, 180).render_at(1.0);
+    let ink = Renderer::new(&episode(&p, &solo("Marta", "ink", "")), 320, 180).render_at(1.0);
+    assert!(diff_pixels(&plain, &ink) > 200, "ink must look different");
+    // The line colour (near-black blue ink) shows up where the plain version has none.
+    let dark = |c: [u8; 3]| c[0] < 40 && c[1] < 40 && c[2] < 55;
+    assert!(count(&ink, dark) > count(&plain, dark) + 30);
+    assert_eq!(ink.data(), Renderer::new(&episode(&p, &solo("Marta", "ink", "")), 320, 180).render_at(1.0).data());
+}

@@ -153,6 +153,8 @@ pub enum StmtKind {
     Sfx(Sfx),
     Music(Music),
     Wait(f64),
+    /// `transition dissolve for 1s`: applies to the next camera change.
+    Transition { kind: String, dur: Option<f64> },
     Together(Vec<Stmt>),
     Give { who: String, item: String },
     Wound { who: String, part: String, state: String },

@@ -3,6 +3,7 @@
 
 pub mod character;
 pub mod clay;
+pub mod ink;
 pub mod draw;
 pub mod encode;
 pub mod export;
@@ -11,6 +12,7 @@ pub mod pose;
 pub mod preview;
 pub mod puppet;
 pub mod set;
+pub mod transition;
 
 use character::{draw_character_ex, Placement, View};
 use draw::{Cam, Painter};
@@ -68,6 +70,12 @@ impl<'a> Renderer<'a> {
                 }
             }
         }
+        if let Some((pose_out, pose_in, m, kind)) = sc.transition_at(lt) {
+            let (need_out, need_in) = transition::needs(kind, m);
+            let out = need_out.then(|| self.render_scene(sc, pose_out, frames.clone()));
+            let inc = need_in.then(|| self.render_scene(sc, pose_in, frames.clone()));
+            return transition::blend(kind, out.as_ref(), inc.as_ref(), m);
+        }
         self.render_scene(sc, sc.camera_at(lt), frames)
     }
 
@@ -89,6 +97,21 @@ impl<'a> Renderer<'a> {
             let a = &sc.actors[fr.idx];
             let hgt = a.def.height();
             let rr = hgt * 0.24;
+            if a.def.style == "toon_3d" && !a.def.has_svg() {
+                // Real 3D characters cast a stretched, soft shadow away from the key light.
+                let dir = [0.55f64, -0.2];
+                for (len, wid) in [(1.0, 1.0), (0.72, 0.8), (0.45, 0.6)] {
+                    let poly: Vec<V3> = (0..24)
+                        .map(|i| {
+                            let ang = i as f64 / 24.0 * std::f64::consts::TAU;
+                            let (ex, ez) = (ang.cos() * rr * wid, ang.sin() * rr * 0.9 * wid);
+                            [fr.kin.pos[0] + ex + dir[0] * hgt * 0.5 * len, 0.004, fr.kin.pos[1] + ez + dir[1] * hgt * 0.5 * len]
+                        })
+                        .collect();
+                    p.poly3_alpha(&cam, &poly, oneiro_core::Rgb(0, 0, 0), 34);
+                }
+                continue;
+            }
             let poly: Vec<V3> = (0..20)
                 .map(|i| {
                     let ang = i as f64 / 20.0 * std::f64::consts::TAU;
@@ -207,7 +230,7 @@ pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorF
             draw_character_ex(pm, def, fr, view, pl, tint, px, outline);
         }
     };
-    if def.style != "clay" {
+    if def.style != "clay" && def.style != "ink" {
         base(pm, pl, 1.0);
         return;
     }
@@ -215,7 +238,7 @@ pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorF
     let size_px = hh * pl.scale;
     let seed = hash_str(&def.name);
     let frame12 = (fr.t * 12.0).floor() as i64;
-    let (jx, jy) = clay::jitter(frame12, seed, size_px);
+    let (jx, jy) = if def.style == "clay" { clay::jitter(frame12, seed, size_px) } else { (0.0, 0.0) };
     // A layer around the character (generous: raised arms, a hat, a wave).
     let seat = (fr.kin.sit * fr.kin.seat_h) as f32 * pl.scale; // sitting on a stool lifts the whole body
     let (hw, up, down) = (0.8 * size_px, 1.35 * size_px + seat, 0.12 * size_px);
@@ -228,8 +251,13 @@ pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorF
     }
     let Some(mut layer) = Pixmap::new((x1 - x0) as u32, (y1 - y0) as u32) else { return };
     let local = Placement { sx: pl.sx - x0 as f32 + jx, sy: pl.sy - y0 as f32 + jy, scale: pl.scale };
-    base(&mut layer, &local, 0.0);
-    clay::shade(&mut layer, size_px, (local.sx, local.sy), seed);
+    if def.style == "clay" {
+        base(&mut layer, &local, 0.0);
+        clay::shade(&mut layer, size_px, (local.sx, local.sy), seed);
+    } else {
+        base(&mut layer, &local, 0.0);
+        ink::shade(&mut layer, size_px, (local.sx, local.sy), seed);
+    }
     pm.draw_pixmap(x0 as i32, y0 as i32, layer.as_ref(), &tiny_skia::PixmapPaint::default(), Transform::identity(), None);
 }
 

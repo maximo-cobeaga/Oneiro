@@ -207,7 +207,7 @@ impl Parser {
                         let mut style = None;
                         if self.word().as_deref() == Some("style") {
                             self.bump();
-                            style = self.expect_word("a style name (cutout_2d, rubber_hose, clay)");
+                            style = self.expect_word("a style name (cutout_2d, rubber_hose, clay, ink, toon_3d)");
                         }
                         if let (Some(kind), Some(name)) = (kind, name) {
                             f.uses.push(Use { kind, name, style, pos });
@@ -518,6 +518,16 @@ impl Parser {
             "wait" => {
                 self.bump();
                 self.expect_dur().map(StmtKind::Wait)
+            }
+            "transition" => {
+                self.bump();
+                let kind = self.expect_word("a transition (dissolve, fade_black, fade_white, wipe_left, wipe_right)")?;
+                let mut dur = None;
+                if self.word().as_deref() == Some("for") {
+                    self.bump();
+                    dur = Some(self.expect_dur()?);
+                }
+                Some(StmtKind::Transition { kind, dur })
             }
             "give" => {
                 self.bump();
