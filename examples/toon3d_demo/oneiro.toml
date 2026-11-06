@@ -1,0 +1,6 @@
+# Oneiro project manifest
+name = "Toon 3D Demo"
+default_style = "toon_3d"
+fps = 24
+width = 1920
+height = 1080

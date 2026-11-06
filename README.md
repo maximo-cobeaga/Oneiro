@@ -23,7 +23,7 @@ scene 1 "Late order" in diner {
 }
 ```
 
-## Status: Phases 0-6 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter)
+## Status: Phases 0-7 done (language, CLI renderer, IDE, AI integration, audio studio, styles, hybrid cutter, 3D toon + physics)
 
 - **Language + CLI:** parser, solver, CPU renderer, lipsync and mp4 export in the `cutout_2d` (South Park-like) style, on CPU only.
 - **Oneiro Studio (IDE):** live viewport, script editor with diagnostics, timeline, library, block-based character builder,
@@ -37,7 +37,9 @@ scene 1 "Late order" in diner {
 
 - **Hybrid cutter:** turn an illustration (plain background or transparent PNG) into an animated character: Oneiro or a vision AI proposes the head, body, arm and leg, you drag the boxes, the engine validates. See [docs/09-cutter.md](docs/09-cutter.md).
 
-Next: 3D (`toon_3d`), physics and cloth, then polish. See [docs/04-roadmap.md](docs/04-roadmap.md).
+- **3D toon style:** characters as real 3D geometry with cel shading, ink outlines and simulated cloth capes and springy tails; a GPU (wgpu) renderer with an automatic CPU fallback. See [docs/10-toon3d.md](docs/10-toon3d.md).
+
+Next: polish, sets in 3D, imported models and more physics. See [docs/04-roadmap.md](docs/04-roadmap.md).
 
 ![Oneiro Studio](docs/img/ide-overview.png)
 
@@ -89,6 +91,8 @@ value) and `state.out` (story state).
 | [docs/07-audio.md](docs/07-audio.md) | Audio studio: voices, SFX, music, mixing, IDE tab, commands |
 | [docs/08-styles.md](docs/08-styles.md) | Styles per character, vector (SVG) characters, AI-drawn characters |
 | [docs/09-cutter.md](docs/09-cutter.md) | The hybrid cutter: from an illustration to a rigged character |
+| [docs/10-toon3d.md](docs/10-toon3d.md) | The 3D toon style, cape and tail physics, GPU and CPU renderers |
+| [examples/toon3d_demo/](examples/toon3d_demo/) | A 3D scene with physics, voices and music |
 | [examples/style_gallery/](examples/style_gallery/) | Hybrid and clay episodes, vector characters |
 | [examples/first_short/](examples/first_short/) | The Phase 1 example project |
 

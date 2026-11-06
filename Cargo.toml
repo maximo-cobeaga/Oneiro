@@ -11,6 +11,7 @@ members = [
     "crates/oneiro-mcp",
     "crates/oneiro-voice",
     "crates/oneiro-cutter",
+    "crates/oneiro-toon3d",
 ]
 
 [workspace.package]

@@ -2507,6 +2507,7 @@ dependencies = [
  "oneiro-cutter",
  "oneiro-lang",
  "oneiro-render",
+ "oneiro-toon3d",
  "oneiro-voice",
 ]
 
@@ -2565,8 +2566,21 @@ dependencies = [
  "oneiro-audio",
  "oneiro-core",
  "oneiro-lang",
+ "oneiro-toon3d",
  "rayon",
  "tiny-skia",
+]
+
+[[package]]
+name = "oneiro-toon3d"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "oneiro-audio",
+ "oneiro-core",
+ "pollster 0.4.0",
+ "tiny-skia",
+ "wgpu",
 ]
 
 [[package]]

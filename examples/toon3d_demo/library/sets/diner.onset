@@ -1,0 +1,36 @@
+# A small night diner. Coordinates are meters: x east, z north, origin at the center of the floor.
+set diner {
+  size: 8m x 6m
+  height: 3m
+
+  palette {
+    wall: #EBDFC2
+    wall_alt: #E0D1AC
+    floor: #DCD6C2
+    floor_alt: #34344A
+    trim: #B22A36
+  }
+
+  anchors {
+    door:    { pos: (-3.4, -1.0), facing: east }
+    floor:   { pos: (0.0, -0.6), facing: south }
+    floor:   { pos: (0.0, -0.6), facing: south }
+    counter: { pos: (0.0, 2.35), solid: true }
+    stool_1: { pos: (-1.4, 1.4), seat: true, facing: north }
+    stool_2: { pos: (0.9, 1.4), seat: true, facing: north }
+    stool_3: { pos: (2.3, 1.4), seat: true, facing: north }
+    clock:   (2.5, 2.15, 2.95)
+  }
+
+  props {
+    counter:  library.props.counter    { at: (0.0, 2.35), width: 5.2 }
+    stool_1:  library.props.stool      { at: (-1.4, 1.4) }
+    stool_2:  library.props.stool      { at: (0.9, 1.4) }
+    stool_3:  library.props.stool      { at: (2.3, 1.4) }
+    pie_case: library.props.pie_case   { at: (-1.6, 2.35) }
+    clock:    library.props.wall_clock { wall: north, at: 2.5, height_at: 2.15 }
+    window_1: library.props.window     { wall: north, at: -2.3 }
+    door:     library.props.door       { wall: west, at: -1.0 }
+    table_1:  library.props.table      { at: (2.8, -1.6) }
+  }
+}

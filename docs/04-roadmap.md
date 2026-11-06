@@ -9,7 +9,7 @@
 | 4 | Audio studio | **Done** - see docs/07-audio.md and results below |
 | 5 | Style expansion | **Done** - see docs/08-styles.md and results below |
 | 6 | Hybrid cutter (tier C) | **Done** - see docs/09-cutter.md and results below |
-| 7 | toon3d | wgpu 3D toon renderer; then physics and cloth for 3D only |
+| 7 | toon3d | **Done** - see docs/10-toon3d.md and results below |
 
 ## Phase 1 acceptance results
 
@@ -150,3 +150,31 @@ front, Codex or Anthropic API vision for this flow (same code path, not run), an
 
 Known limitations: front-facing symmetric characters only; no inpainting of hidden areas; tails and accessories are not parts;
 the illustration's face does not lip-sync; rigid limbs.
+
+
+## Phase 7 results (toon_3d and physics)
+
+| Goal | Result |
+|---|---|
+| `toon_3d` style | Real 3D characters (procedural meshes from the character definition), cel shading with soft bands, toon highlight, rim light and ink outlines; same skeleton, expressions, gaze and lip-sync as the other styles |
+| Per-character and hybrid | Mixes with cutout, rubber hose, clay and vector characters in one scene; layers use the 2D set's camera and are composited by depth |
+| Two renderers | A CPU software rasterizer (identical everywhere, no GPU needed) and a headless wgpu backend (same shading in WGSL, 4x MSAA); automatic choice with fallback; `--3d` / `ONEIRO_3D` to force |
+| Physics | Verlet cloth cape (collides with torso and floor) and a spring-chain tail, simulated once per scene at compile time so frames stay a pure function of time |
+| Format | `style: toon_3d` and `toon3d { cape: #RRGGBB, tail: #RRGGBB }` in `.onchar`; builder UI for both; AI guide and vocabulary updated |
+| Example | `examples/toon3d_demo` (a hero with a cape, a squirrel with a tail, voices, music) |
+
+Tests: 177 automated tests across the workspace (all green with the GPU and with `ONEIRO_3D=cpu`). New ones cover the meshes
+(outward normals, winding, spans), the rasterizer (coverage, cel bands, outline width, depth order, clipping), GPU vs CPU
+agreement on a sphere/capsule and on a real character with a cape, 3D characters inside real scenes (volume and ink, turning,
+face only from the front, cape on the back and streaming, lip-sync, night tint, all looks in one reproducible scene) and the
+physics (attachment, no penetration of the torso or floor, cloth edge lengths, trailing when running, determinism, extras parsing).
+Verified for real: stills of every shot of the demo on the RTX 4060 (Vulkan) and with the CPU renderer, close-ups of faces, the render
+speed (1080p, 16 threads: GPU 2.5x real time, CPU 1.6-2.3x; one thread at 720p: GPU 2.0x, CPU 0.7x).
+
+**Not verified:** other graphics adapters and drivers (only an NVIDIA RTX 4060 on Vulkan; DirectX 12 and Metal use the same code
+but were not run), machines without a GPU (the CPU path is the fallback and is tested), long scenes beyond a minute of physics,
+and 3D characters in sets other than the diner.
+
+Known limitations: only block characters become real 3D (vector and cut-out characters stay flat puppets); the set and props are
+still 2D (no 3D shadows between them and characters); physics is limited to the cape and the tail; simple procedural meshes, no
+imported models or textures.

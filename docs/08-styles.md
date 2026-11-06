@@ -17,7 +17,7 @@ cook and a robot drawn by an AI in the same shot.
 | In the character file | `style: rubber_hose` (a line of the `.onchar`) | The character's own look (the IDE builder has a Style selector) |
 
 Order: `use ... style` > the character's own `style:` > `style default:` > `default_style` in `oneiro.toml`.
-Unknown names get a suggestion (`E2301`); `toon_3d` is recognised but reported as planned (Phase 7).
+Unknown names get a suggestion (`E2301`); `ink` (a whole-frame post style) is recognised but reported as planned.
 
 ```
 style default: cutout_2d
@@ -26,7 +26,7 @@ use character Blob style rubber_hose      # 1930s noodle limbs
 use character Pip                         # drawn from SVG parts (tier B)
 ```
 
-The same scene rendered in all the styles is in [`examples/style_gallery`](../examples/style_gallery):
+Styles: `cutout_2d`, `rubber_hose`, `clay` and `toon_3d` (see [10-toon3d.md](10-toon3d.md)). The same scene rendered in the first styles is in [`examples/style_gallery`](../examples/style_gallery):
 `script.onr` (hybrid) and `clay.onr` (everybody in clay).
 
 ## The styles

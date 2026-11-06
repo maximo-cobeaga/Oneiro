@@ -10,20 +10,7 @@ use oneiro_core::{CharacterDef, Rgb};
 use std::f32::consts::{PI, TAU};
 use tiny_skia::{PathBuilder, Pixmap, Transform};
 
-pub struct View {
-    /// Body orientation relative to the camera: 1 = facing the camera, -1 = facing away.
-    pub front: f64,
-    /// Positive = facing screen-right.
-    pub side: f64,
-    pub h_front: f64,
-    pub h_side: f64,
-    pub eye_dx: f64,
-    pub eye_dy: f64,
-    /// Which screen side a pointing gesture should use (+1 right, -1 left).
-    pub target_side: f64,
-    pub target_up: f64,
-}
-
+pub use oneiro_core::pose::View;
 pub struct Placement {
     pub sx: f32,
     pub sy: f32,

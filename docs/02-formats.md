@@ -49,7 +49,7 @@ character Marta {
 }
 ```
 
-Optional entries: `style: rubber_hose` (the character's own look: `cutout_2d`, `rubber_hose` or `clay`) and a `parts { ... }`
+Optional entries: `toon3d { cape: #C02030, tail: #E0782A }` (cloth cape and springy tail for the `toon_3d` style, see [10-toon3d.md](10-toon3d.md)), `style: rubber_hose` (the character's own look: `cutout_2d`, `rubber_hose` or `clay`) and a `parts { ... }`
 block that replaces the library blocks with four SVG files (head, body, arm, leg); see [08-styles.md](08-styles.md).
 
 A character is **Rig + Skin (per style) + Face + Wardrobe + Voice + Sheet**. Parts and wardrobe come from the

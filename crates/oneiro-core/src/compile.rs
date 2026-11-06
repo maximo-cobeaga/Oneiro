@@ -425,7 +425,8 @@ pub fn compile_source(project: &Project, label: &str, src: &str, lock: &Lock) ->
             );
             continue;
         }
-        let scene = cx.scene(sc, sets.get(&sc.set).unwrap().clone(), global_t);
+        let mut scene = cx.scene(sc, sets.get(&sc.set).unwrap().clone(), global_t);
+        crate::physics::attach(&mut scene);
         global_t += scene.dur;
         episode.scenes.push(scene);
     }

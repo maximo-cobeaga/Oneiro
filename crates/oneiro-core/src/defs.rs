@@ -118,6 +118,21 @@ pub struct CharacterDef {
     pub style: String,
     /// Vector parts (tier B). `None` for characters built from library blocks (tier A).
     pub svg: Option<SvgRig>,
+    /// Extras of the `toon_3d` style: a cloth cape and a springy tail (simulated by the physics).
+    pub toon3d: Toon3d,
+}
+
+/// Colors of the optional physics extras of a 3D character.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Toon3d {
+    pub cape: Option<Rgb>,
+    pub tail: Option<Rgb>,
+}
+
+impl Toon3d {
+    pub fn any(&self) -> bool {
+        self.cape.is_some() || self.tail.is_some()
+    }
 }
 
 impl CharacterDef {
@@ -152,6 +167,7 @@ impl CharacterDef {
             styles: BTreeMap::new(),
             style: String::new(),
             svg: None,
+            toon3d: Toon3d::default(),
         };
         if b.name.is_none() {
             diags.push(
@@ -187,6 +203,25 @@ impl CharacterDef {
                 "parts" => {
                     if let Some(inner) = e.block() {
                         c.svg = Some(parse_parts(inner, file, &c.name, diags));
+                    }
+                }
+                "toon3d" => {
+                    if let Some(inner) = e.block() {
+                        for te in inner {
+                            match te.key.as_str() {
+                                "cape" | "tail" => match color_of(te.value()) {
+                                    Some(col) => {
+                                        if te.key == "cape" {
+                                            c.toon3d.cape = Some(col);
+                                        } else {
+                                            c.toon3d.tail = Some(col);
+                                        }
+                                    }
+                                    None => diags.push(Diagnostic::error("E1140", file, te.pos, format!("'{}' needs a color, for example {}: #C02030", te.key, te.key))),
+                                },
+                                other => diags.push(Diagnostic::error("E1140", file, te.pos, format!("unknown toon3d option '{}'", other)).suggest("options: cape, tail (each a color like #C02030)")),
+                            }
+                        }
                     }
                 }
                 "build" => {
@@ -755,6 +790,16 @@ impl CharacterDef {
         s.push_str(&format!("    mouth: library.mouths.{}{}\n", self.mouth.kind, self.mouth.params_source()));
         s.push_str(&format!("    body:  library.bodies.{}{}\n", self.body.kind, self.body.params_source()));
         s.push_str("  }\n");
+        if self.toon3d.any() {
+            let mut items: Vec<String> = Vec::new();
+            if let Some(c) = self.toon3d.cape {
+                items.push(format!("cape: {}", c.hex()));
+            }
+            if let Some(c) = self.toon3d.tail {
+                items.push(format!("tail: {}", c.hex()));
+            }
+            s.push_str(&format!("  toon3d {{ {} }}\n", items.join(", ")));
+        }
         if let Some(rig) = &self.svg {
             s.push_str("  parts {\n");
             for name in SVG_PARTS {

@@ -1,0 +1,41 @@
+oneiro 0.1
+project "Toon 3D Demo"
+style default: toon_3d
+
+# Everybody is a real 3D character with cel shading and ink outlines.
+# Hero has a cloth cape and Squirrel a springy tail: both are simulated physics.
+use character Hero
+use character Squirrel
+use character Marta
+use character Blob style cutout_2d
+use set diner
+
+scene 1 "Capes and tails" in diner {
+  time: day
+  place Hero at diner.door
+  place Squirrel at diner.counter
+  place Marta at diner.stool_2 facing diner.counter
+  place Blob at diner.stool_3 facing diner.counter
+
+  music demo_bgm volume 0.3 fade_in 1s
+  camera wide from south move dolly_in for 5s
+  Hero walks_to (0.0, -0.2)
+  Hero (happy): "Nobody panic. I am here." audio "audio/hero_01.wav"
+  Hero waves
+
+  cut to medium on Squirrel
+  Squirrel runs_to (-1.5, 0.6)
+  Squirrel (surprised): "It's the cape guy!" audio "audio/squirrel_01.wav"
+
+  camera over_shoulder Hero -> Squirrel
+  Hero turns_to diner.counter
+  Hero walks_to (1.2, -0.3)
+  Squirrel shrugs
+  Marta (annoyed): "Sit down, both of you." audio "audio/marta_01.wav"
+
+  camera wide from east move dolly_out for 4s
+  Squirrel runs_to (1.8, 0.4)
+  Hero runs_to (-1.5, 0.0)
+  music stop fade_out 2s
+  wait 1s
+}

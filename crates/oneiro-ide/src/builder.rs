@@ -234,6 +234,21 @@ impl App {
                 });
             });
             ui.label(RichText::new("cutout_2d: paper cutout - rubber_hose: 1930s noodle limbs - clay: stop-motion plasticine. A script can override it with `use character X style Y`.").weak().small());
+            if d.style == "toon_3d" {
+                for (key, label, default) in [("cape", "cape (cloth physics)", Rgb(192, 32, 48)), ("tail", "tail (spring physics)", Rgb(224, 120, 42))] {
+                    let slot = if key == "cape" { &mut d.toon3d.cape } else { &mut d.toon3d.tail };
+                    let mut on = slot.is_some();
+                    let mut arr = rgb_to_arr(slot.unwrap_or(default));
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut on, label);
+                        if on {
+                            egui::color_picker::color_edit_button_srgb(ui, &mut arr);
+                        }
+                    });
+                    *slot = on.then(|| Rgb(arr[0], arr[1], arr[2]));
+                }
+                ui.label(RichText::new("3D characters are real geometry with cel shading and ink outlines; the cape and tail are simulated in every scene.").weak().small());
+            }
             if d.has_svg() {
                 ui.label(RichText::new("This character is drawn from vector parts (library/parts). The blocks below only affect its proportions.").color(Color32::from_rgb(120, 190, 240)).small());
             }

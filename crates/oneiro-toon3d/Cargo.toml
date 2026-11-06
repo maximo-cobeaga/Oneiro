@@ -1,0 +1,18 @@
+[package]
+name = "oneiro-toon3d"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["gpu"]
+# The wgpu backend. Without it (or without an adapter at run time) the CPU rasterizer is used.
+gpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck"]
+
+[dependencies]
+oneiro-core = { path = "../oneiro-core" }
+oneiro-audio = { path = "../oneiro-audio" }
+tiny-skia = "0.11"
+wgpu = { version = "30", optional = true }
+pollster = { version = "0.4", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }

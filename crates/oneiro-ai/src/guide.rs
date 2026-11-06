@@ -140,6 +140,8 @@ Rules:
 - `body` is kid, adult or round (`height` 0.6-1.6, optional `width` 0.7-1.5).
 - `wardrobe` takes at most one item per slot (hat, top, bottom, shoes, accessory), only from the list below.
 - `voice pitch` is in Hz (70-400): low for big/older characters, high for small/young ones.
+- Optional `style: toon_3d` makes the character a real 3D toon figure (other styles: cutout_2d, rubber_hose, clay), and
+  `toon3d { cape: #C02030, tail: #E0782A }` adds a cloth cape and/or a springy tail (physics, 3D style only).
 - Be faithful to the user's description; make unspecified choices that fit the character's personality.
 "#;
 

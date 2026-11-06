@@ -21,7 +21,7 @@ oneiro 0.1 - a language and studio for animated series
 USAGE:
   oneiro check <project|script.onr> [--json]
   oneiro render <project|script.onr> [-o out.mp4] [--preview] [--res WxH] [--fps N]
-                [--no-audio] [--hash] [--png-dir DIR] [--no-write]
+                [--no-audio] [--hash] [--png-dir DIR] [--no-write] [--3d cpu|gpu|auto]
   oneiro still <project|script.onr> --time SECONDS [-o frame.png] [--res WxH]
   oneiro demo-audio <project|script.onr> [--force]   placeholder voices/sounds for files a script references
   oneiro cut <image> [project] [--name Name] [--layout file.json] [--ai] [--overlay out.png] [--height 1.15] [--style S]
@@ -86,6 +86,13 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "-o" | "--out" => o.out = Some(val("-o")?),
             "--preview" => o.preview = true,
             "--no-audio" => o.no_audio = true,
+            "--3d" => {
+                let v = val("--3d")?;
+                if !["cpu", "gpu", "auto"].contains(&v.as_str()) {
+                    return Err("--3d must be cpu, gpu or auto".into());
+                }
+                std::env::set_var("ONEIRO_3D", v);
+            }
             "--hash" => o.hash = true,
             "--no-write" => o.no_write = true,
             "--force" => o.force = true,
@@ -229,6 +236,12 @@ fn cmd_render(args: &[String]) -> Result<bool, String> {
     }
     let (w, h) = o.res.unwrap_or(if o.preview { (640, 360) } else { (l.episode.width, l.episode.height) });
     let (w, h) = (w & !1, h & !1); // yuv420p needs even sizes
+    if l.episode.scenes.iter().any(|s| s.actors.iter().any(|a| a.def.style == "toon_3d")) {
+        match oneiro_toon3d::gpu_name() {
+            Some(n) => eprintln!("3D characters: GPU ({})", n),
+            None => eprintln!("3D characters: CPU rasterizer"),
+        }
+    }
 
     if !o.no_write {
         let name = l.script.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();

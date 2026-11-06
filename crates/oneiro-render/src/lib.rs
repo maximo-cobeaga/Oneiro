@@ -184,14 +184,20 @@ impl<'a> Renderer<'a> {
 
         let view = View { front, side, h_front, h_side, eye_dx, eye_dy, target_side, target_up };
         let pl = Placement { sx, sy, scale };
-        draw_styled(&mut *p.pm, def, fr, &view, &pl, tint, px);
+        let phys = sc.actors[fr.idx].physics.as_deref();
+        draw_styled(&mut *p.pm, def, fr, &view, &pl, tint, px, cam, phys);
     }
 }
 
 /// Draws one character in its own style. `cutout_2d` and `rubber_hose` draw straight onto the frame; `clay`
 /// draws the character (whichever base drawing it has) into a layer and shades it like plasticine.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorFrame, view: &View, pl: &Placement, tint: [f64; 3], px: f32) {
+#[allow(clippy::too_many_arguments)]
+pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorFrame, view: &View, pl: &Placement, tint: [f64; 3], px: f32, cam: &Cam, phys: Option<&oneiro_core::physics::Physics>) {
+    if def.style == "toon_3d" && !def.has_svg() {
+        draw_toon3d(pm, def, fr, pl, tint, px, cam, phys);
+        return;
+    }
     let base = |pm: &mut Pixmap, pl: &Placement, outline: f32| {
         if def.has_svg() {
             puppet::draw_puppet(pm, def, fr, view, pl, tint, px, outline);
@@ -258,4 +264,25 @@ where
         start = end;
     }
     Ok(())
+}
+
+/// A real 3D character: rendered into a layer with a camera identical to the 2D set's, then composited.
+#[allow(clippy::too_many_arguments)]
+fn draw_toon3d(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorFrame, pl: &Placement, tint: [f64; 3], px: f32, cam: &Cam, phys: Option<&oneiro_core::physics::Physics>) {
+    let hh = def.height() as f32;
+    let size_px = hh * pl.scale;
+    let seat = (fr.kin.sit * fr.kin.seat_h) as f32 * pl.scale;
+    // Generous layer: a cape streams behind and a raised arm goes above the head.
+    let (hw, up, down) = (1.0 * size_px, 1.45 * size_px + seat, 0.15 * size_px);
+    let x0 = ((pl.sx - hw).floor() as i64).max(0);
+    let y0 = ((pl.sy - up).floor() as i64).max(0);
+    let x1 = ((pl.sx + hw).ceil() as i64).min(pm.width() as i64);
+    let y1 = ((pl.sy + down).ceil() as i64).min(pm.height() as i64);
+    if x1 - x0 < 4 || y1 - y0 < 4 || size_px < 8.0 {
+        return;
+    }
+    let local = oneiro_toon3d::Camera { pos: cam.pos, right: cam.right, up: cam.up, fwd: cam.fwd, f: cam.f, cx: cam.cx - x0 as f64, cy: cam.cy - y0 as f64 };
+    let style = oneiro_toon3d::Style { tint: [tint[0] as f32, tint[1] as f32, tint[2] as f32], outline_px: 2.4 * px };
+    let layer = oneiro_toon3d::render_layer(def, fr, phys, &local, (x1 - x0) as u32, (y1 - y0) as u32, &style, oneiro_toon3d::Backend::Auto);
+    pm.draw_pixmap(x0 as i32, y0 as i32, layer.as_ref(), &tiny_skia::PixmapPaint::default(), Transform::identity(), None);
 }

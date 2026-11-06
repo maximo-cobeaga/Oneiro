@@ -43,10 +43,10 @@ Planned layout:
 
 - **Per-character styles (Phase 5)**: each character is drawn by its own drawer, chosen by `def.style` - `cutout_2d`
   (library blocks), `rubber_hose` (noodle limbs on a shared skeleton, `pose.rs`), vector puppets (`puppet.rs`, SVG parts) - and
-  `clay` is a post-process on any of them (layer, silhouette-as-height-map lighting, attached texture, stop-motion on twos).
+  `toon_3d` (Phase 7) builds real 3D geometry from the same definition, and `clay` is a post-process on any of them (layer, silhouette-as-height-map lighting, attached texture, stop-motion on twos).
   Runs on CPU.
 - **Whole-frame post styles** (`ink`, grain) operate on any frame source and are still planned.
-- **toon3d** (later): wgpu, cel shading + outlines. Same scene model, same anchors.
+- **toon_3d (Phase 7)**: procedural 3D characters with cel shading and ink outlines, drawn by a CPU rasterizer or by wgpu on the GPU, with cape and tail physics simulated at compile time. See 10-toon3d.md.
 - **Compositor**: characters are drawn back to front with the set; `clay` characters go through a transparent layer first.
 
 ## 4. AI layer

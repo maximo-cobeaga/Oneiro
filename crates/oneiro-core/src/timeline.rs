@@ -85,6 +85,8 @@ pub struct ActorTimeline {
     pub gazes: Vec<GazeKey>,
     pub speech: Vec<SpeechSeg>,
     pub blinks: Vec<f64>,
+    /// Cape and tail simulation (3D characters only), filled in by `physics::attach` when the scene is compiled.
+    pub physics: Option<std::sync::Arc<crate::physics::Physics>>,
 }
 
 #[derive(Clone, Debug)]
@@ -140,6 +142,7 @@ impl ActorTimeline {
             gazes: vec![],
             speech: vec![],
             blinks: vec![],
+            physics: None,
         }
     }
 

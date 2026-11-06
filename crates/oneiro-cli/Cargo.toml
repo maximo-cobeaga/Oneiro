@@ -16,3 +16,4 @@ oneiro-render = { path = "../oneiro-render" }
 oneiro-ai = { path = "../oneiro-ai" }
 oneiro-voice = { path = "../oneiro-voice" }
 oneiro-cutter = { path = "../oneiro-cutter" }
+oneiro-toon3d = { path = "../oneiro-toon3d" }

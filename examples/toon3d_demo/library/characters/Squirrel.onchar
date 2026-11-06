@@ -1,0 +1,20 @@
+# Squirrel: a small adult with a big springy tail.
+character Squirrel {
+  rig: library.rigs.biped_cutout
+  style: toon_3d
+  build {
+    head:  library.heads.oval     { size: 0.95, skin_tone: #D9A066, hair: #8A4B22 }
+    eyes:  library.eyes.wide      { spacing: 0.45 }
+    mouth: library.mouths.visemes_basic
+    body:  library.bodies.adult   { height: 0.8 }
+  }
+  toon3d { tail: #E0782A }
+  wardrobe { default: [orange_parka, gray_pants, black_shoes] }
+  voice { provider: sapi, pitch: 320, voice: "Microsoft Zira Desktop", speed: 1.4 }
+  sheet {
+    age: 25
+    traits: [jumpy]
+    notes: "Never stands still."
+  }
+  styles { cutout_2d: auto }
+}
