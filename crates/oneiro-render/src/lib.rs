@@ -4,6 +4,7 @@
 pub mod character;
 pub mod clay;
 pub mod ink;
+pub mod paperdoll;
 pub mod draw;
 pub mod encode;
 pub mod export;
@@ -235,6 +236,24 @@ pub fn draw_styled(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorF
             draw_character_ex(pm, def, fr, view, pl, tint, px, outline);
         }
     };
+    if def.style == "toon_3d" {
+        // A flat drawing (vector or cut-out) in a 3D style: a paper doll turning in the scene.
+        let size_px = def.height() as f32 * pl.scale;
+        let seat = (fr.kin.sit * fr.kin.seat_h) as f32 * pl.scale;
+        let (hw, up, down) = (0.8 * size_px, 1.35 * size_px + seat, 0.12 * size_px);
+        let x0 = ((pl.sx - hw).floor() as i64).max(0);
+        let y0 = ((pl.sy - up).floor() as i64).max(0);
+        let x1 = ((pl.sx + hw).ceil() as i64).min(pm.width() as i64);
+        let y1 = ((pl.sy + down).ceil() as i64).min(pm.height() as i64);
+        if x1 - x0 < 4 || y1 - y0 < 4 || size_px < 8.0 {
+            return;
+        }
+        let Some(mut layer) = Pixmap::new((x1 - x0) as u32, (y1 - y0) as u32) else { return };
+        let local = Placement { sx: pl.sx - x0 as f32, sy: pl.sy - y0 as f32, scale: pl.scale };
+        base(&mut layer, &local, 1.0);
+        paperdoll::compose(pm, &layer, x0 as i32, y0 as i32, local.sx, view.front, view.side, 0.05 * size_px);
+        return;
+    }
     if def.style != "clay" && def.style != "ink" {
         base(pm, pl, 1.0);
         return;
