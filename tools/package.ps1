@@ -6,6 +6,9 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 if (-not $SkipBuild) { cargo build --release -p oneiro-ide -p oneiro-cli; if ($LASTEXITCODE -ne 0) { throw 'build failed' } }
+# The program cannot be replaced while it is open: close it first.
+Get-Process | Where-Object { $_.ProcessName -like 'Oneiro Studio*' } | ForEach-Object { Write-Host 'closing Oneiro Studio...'; $_ | Stop-Process -Force }
+Start-Sleep -Milliseconds 700
 $dist = Join-Path $root 'dist\Oneiro'
 if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
 New-Item -ItemType Directory -Path $dist | Out-Null
