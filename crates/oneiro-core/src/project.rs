@@ -128,7 +128,8 @@ impl Project {
                         self.characters.insert(c.name.clone(), c);
                     }
                     "set" => {
-                        let s = SetDef::from_block(b, &label, diags);
+                        let mut s = SetDef::from_block(b, &label, diags);
+                        s.load_models(&self.root, &label, diags);
                         self.sets.insert(s.name.clone(), s);
                     }
                     _ => {}

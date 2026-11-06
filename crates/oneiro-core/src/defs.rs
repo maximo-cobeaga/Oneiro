@@ -486,6 +486,9 @@ pub struct PropInst {
     pub solid: Option<bool>,
     /// `look: toon_3d` draws this prop as a real 3D mesh; `look: flat` keeps the 2D drawing.
     pub look: Option<String>,
+    /// `model: "models/x.obj"` (kind `model`): an OBJ file scaled to `height` and standing on the floor.
+    pub model: Option<String>,
+    pub mesh: Option<std::sync::Arc<crate::obj::ObjModel>>,
 }
 
 #[derive(Clone, Debug)]
@@ -694,6 +697,8 @@ fn parse_prop(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Prop
         color: None,
         solid: None,
         look: None,
+        model: None,
+        mesh: None,
     };
     let num = |k: &str| entry(&entries, k).and_then(|x| x.value()).and_then(|v| v.as_num());
     match entry(&entries, "at").and_then(|x| x.value()) {
@@ -726,7 +731,15 @@ fn parse_prop(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Prop
     p.color = color_of(entry(&entries, "color").and_then(|x| x.value()));
     p.solid = entry(&entries, "solid").and_then(|x| x.value()).and_then(|v| v.as_bool());
     p.look = look_of(&entries, file, e.pos, diags);
+    p.model = entry(&entries, "model").and_then(|x| x.value()).and_then(|v| v.as_str()).map(|s| s.to_string());
+    if p.kind == "model" && p.model.is_none() {
+        diags.push(Diagnostic::error("E1121", file, e.pos, "a model prop needs a file").suggest("model: \"models/chair.obj\""));
+    }
     p.look = look_of(&entries, file, e.pos, diags);
+    p.model = entry(&entries, "model").and_then(|x| x.value()).and_then(|v| v.as_str()).map(|s| s.to_string());
+    if p.kind == "model" && p.model.is_none() {
+        diags.push(Diagnostic::error("E1121", file, e.pos, "a model prop needs a file").suggest("model: \"models/chair.obj\""));
+    }
     Some(p)
 }
 
@@ -885,6 +898,25 @@ fn look_of(entries: &[Entry], file: &str, pos: Pos, diags: &mut Vec<Diagnostic>)
 impl SetDef {
     /// True when this prop is drawn as a 3D mesh.
     pub fn prop_is_3d(&self, p: &PropInst) -> bool {
-        p.look.as_deref().unwrap_or(&self.look) == "toon_3d"
+        p.kind == "model" || p.look.as_deref().unwrap_or(&self.look) == "toon_3d"
+    }
+}
+
+impl SetDef {
+    /// Reads the OBJ files of `model` props (paths relative to `root`, inside the project).
+    pub fn load_models(&mut self, root: &Path, label: &str, diags: &mut Vec<Diagnostic>) {
+        let at = Pos { line: 1, col: 1 };
+        for p in self.props.iter_mut() {
+            let Some(file) = p.model.clone() else { continue };
+            if Path::new(&file).is_absolute() || file.split(['/', '\\']).any(|s| s == "..") {
+                diags.push(Diagnostic::error("E1122", label, at, format!("prop '{}': the model file must be inside the project (no absolute paths or '..')", p.name)));
+                continue;
+            }
+            let res = std::fs::read_to_string(root.join(&file)).map_err(|e| format!("cannot read {}: {}", file, e)).and_then(|t| crate::obj::ObjModel::parse(&t).map_err(|e| format!("{}: {}", file, e)));
+            match res {
+                Ok(m) => p.mesh = Some(std::sync::Arc::new(m)),
+                Err(e) => diags.push(Diagnostic::error("E1122", label, at, format!("prop '{}': {}", p.name, e))),
+            }
+        }
     }
 }

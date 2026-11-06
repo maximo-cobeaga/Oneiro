@@ -7,6 +7,7 @@ pub mod defs;
 pub mod lock;
 pub mod math;
 pub mod nav;
+pub mod obj;
 pub mod physics;
 pub mod pose;
 pub mod project;
