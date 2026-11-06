@@ -482,6 +482,8 @@ pub struct PropInst {
     pub h: Option<f64>,
     pub d: Option<f64>,
     pub color: Option<Rgb>,
+    /// `solid: true` makes any prop an obstacle people walk around; `solid: false` lets them through.
+    pub solid: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -680,6 +682,7 @@ fn parse_prop(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Prop
         h: None,
         d: None,
         color: None,
+        solid: None,
     };
     let num = |k: &str| entry(&entries, k).and_then(|x| x.value()).and_then(|v| v.as_num());
     match entry(&entries, "at").and_then(|x| x.value()) {
@@ -710,6 +713,7 @@ fn parse_prop(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Prop
     p.h = num("height");
     p.d = num("depth");
     p.color = color_of(entry(&entries, "color").and_then(|x| x.value()));
+    p.solid = entry(&entries, "solid").and_then(|x| x.value()).and_then(|v| v.as_bool());
     Some(p)
 }
 

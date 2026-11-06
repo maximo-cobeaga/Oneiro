@@ -99,7 +99,7 @@ impl<'a> Renderer<'a> {
             let rr = hgt * 0.24;
             if a.def.style == "toon_3d" && !a.def.has_svg() {
                 // Real 3D characters cast a stretched, soft shadow away from the key light.
-                let dir = [0.55f64, -0.2];
+                let dir = light_dir(&sc.time_of_day);
                 for (len, wid) in [(1.0, 1.0), (0.72, 0.8), (0.45, 0.6)] {
                     let poly: Vec<V3> = (0..24)
                         .map(|i| {
@@ -313,4 +313,14 @@ fn draw_toon3d(pm: &mut Pixmap, def: &oneiro_core::CharacterDef, fr: &ActorFrame
     let style = oneiro_toon3d::Style { tint: [tint[0] as f32, tint[1] as f32, tint[2] as f32], outline_px: 2.4 * px };
     let layer = oneiro_toon3d::render_layer(def, fr, phys, &local, (x1 - x0) as u32, (y1 - y0) as u32, &style, oneiro_toon3d::Backend::Auto);
     pm.draw_pixmap(x0 as i32, y0 as i32, layer.as_ref(), &tiny_skia::PixmapPaint::default(), Transform::identity(), None);
+}
+
+/// Where character shadows fall on the floor (x, z; the length is in body heights x 2): short and
+/// nearly straight down under the diner's lamps at night, long and low at dusk, medium by day.
+pub fn light_dir(time_of_day: &str) -> [f64; 2] {
+    match time_of_day {
+        "night" => [0.12, -0.08],
+        "dusk" => [-0.95, -0.3],
+        _ => [0.55, -0.2],
+    }
 }
