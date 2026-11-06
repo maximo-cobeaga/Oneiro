@@ -70,8 +70,12 @@ pub fn validate_set(source: &str, svgs: &BTreeMap<String, String>) -> Result<(Se
     let mut source = source.to_string();
     let mut names: Vec<(String, bool)> = set.backdrops.values().map(|b| (b.file.clone(), true)).collect();
     names.extend(set.sprites.iter().map(|s| (s.art.file.clone(), false)));
-    if set.backdrops.is_empty() {
-        diags.push(err("E1127", "add a `backdrops` block with at least a `north` picture".into()));
+    let pieces = set.props.iter().filter(|p| p.wall.is_none()).count() + set.solids.len() + set.sprites.len() + set.backdrops.len();
+    if pieces < 6 {
+        diags.push(err("E1127", format!("the scenario has only {} things in it; build it from at least 6 (props, solids, sprites)", pieces)));
+    }
+    if set.solids.len() > 120 || set.props.len() > 120 {
+        diags.push(err("E1127", "too many pieces: use at most 120 props and 120 solids".into()));
     }
     if set.sprites.len() > 24 {
         diags.push(err("E1127", format!("{} sprites is too many: use 24 at most", set.sprites.len())));

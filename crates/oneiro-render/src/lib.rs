@@ -42,6 +42,7 @@ enum Item {
     Piece { prop: usize, piece: usize },
     Actor(usize),
     Sprite(usize),
+    Solid(usize),
 }
 
 impl<'a> Renderer<'a> {
@@ -143,6 +144,10 @@ impl<'a> Renderer<'a> {
             let c = cam.to_cam([fr.kin.pos[0], 0.0, fr.kin.pos[1]]);
             items.push((c[2] - 0.2, Item::Actor(fr.idx)));
         }
+        for (i, sd) in sc.set.solids.iter().enumerate() {
+            let c = cam.to_cam([sd.at[0], sd.y + sd.size[1] * 0.5, sd.at[1]]);
+            items.push((c[2], Item::Solid(i)));
+        }
         for (i, sp) in sc.set.sprites.iter().enumerate() {
             items.push((open::sprite_depth(&cam, sp), Item::Sprite(i)));
         }
@@ -158,6 +163,10 @@ impl<'a> Renderer<'a> {
                         continue;
                     }
                     set::draw_piece(&mut p, &cam, &sc.set, prop, piece, px);
+                }
+                Item::Solid(i) => {
+                    let mesh = oneiro_toon3d::stock::solid_mesh(&sc.set.solids[i]);
+                    draw_mesh3d(&mut *p.pm, mesh, tint, px, &cam);
                 }
                 Item::Sprite(i) => open::draw_sprite(p.pm, &cam, &sc.set.sprites[i], tint, time),
                 Item::Actor(i) => {
@@ -368,6 +377,11 @@ pub fn light_dir(time_of_day: &str) -> [f64; 2] {
 /// A prop drawn as a real 3D mesh (`look: toon_3d`): the mesh's screen bounds become a transparent layer.
 fn draw_prop3d(pm: &mut Pixmap, set: &oneiro_core::SetDef, prop: usize, piece: usize, tint: [f64; 3], px: f32, cam: &Cam) {
     let mesh = oneiro_toon3d::props::prop_mesh(set, &set.props[prop], piece);
+    draw_mesh3d(pm, mesh, tint, px, cam);
+}
+
+/// A world-space mesh drawn through the 3D toon renderer into a layer the size of its screen bounds.
+fn draw_mesh3d(pm: &mut Pixmap, mesh: oneiro_toon3d::Mesh, tint: [f64; 3], px: f32, cam: &Cam) {
     if mesh.is_empty() {
         return;
     }

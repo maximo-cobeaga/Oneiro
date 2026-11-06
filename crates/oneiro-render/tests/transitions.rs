@@ -121,3 +121,22 @@ fn open_sets_draw_sky_ground_backdrops_and_animated_sprites() {
     let east = r.render_at(8.0);
     assert_ne!(east.data(), a.data());
 }
+
+#[test]
+fn open_3d_sets_have_real_geometry_seen_from_every_side() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/village").canonicalize().unwrap();
+    let mut d = vec![];
+    let p = Project::load(&root, &mut d);
+    let text = std::fs::read_to_string(root.join("script.onr")).unwrap();
+    let (e, d) = compile_source(&p, "script.onr", &text, &Lock::default());
+    assert!(d.iter().all(|x| !x.is_error()));
+    let r = Renderer::new(&e, 320, 180);
+    let south = r.render_at(1.0);
+    let north = r.render_at(8.5);
+    assert_ne!(south.data(), north.data(), "the other side shows different things");
+    assert_eq!(south.data(), r.render_at(1.0).data());
+    // Red roofs (house) and green hills exist in the south view.
+    let count = |pm: &tiny_skia::Pixmap, f: &dyn Fn([u8; 3]) -> bool| pm.data().chunks(4).filter(|c| f([c[0], c[1], c[2]])).count();
+    assert!(count(&south, &|c| c[0] > 170 && c[1] < 100 && c[2] < 90) > 150, "red roofs");
+    assert!(count(&south, &|c| c[1] as i32 > c[0] as i32 + 40 && c[1] as i32 > c[2] as i32 + 20) > 3000, "green hills and grass");
+}

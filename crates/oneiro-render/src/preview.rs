@@ -30,6 +30,7 @@ pub fn plain_set() -> SetDef {
         ground: Rgb(226, 208, 150),
         backdrops: Default::default(),
         sprites: vec![],
+        solids: vec![],
     }
 }
 

@@ -1,0 +1,44 @@
+# An open set made of real 3D pieces in the toon style: no walls, no ceiling, a camera can go anywhere.
+set village {
+  kind: open
+  size: 18m x 14m
+
+  sky: [#5BC0F8, #FFEFC4]
+  ground: #8ED081
+
+  anchors {
+    start: (-6.0, -3.0)
+    well: (0.0, -1.8)
+    door: (4.0, 2.4)
+    bench: (-3.0, 3.5)
+    road: (0.0, -4.5)
+  }
+
+  props {
+    house_1: library.props.house { at: (4.0, 5.0), yaw: 180 }
+    house_2: library.props.house { at: (-7.5, 5.5), yaw: 160, color: #F4C7C3 }
+    tree_1:  library.props.tree  { at: (-9.0, -1.0) }
+    tree_2:  library.props.tree  { at: (8.5, -2.0), height: 4.4 }
+    pine_1:  library.props.pine  { at: (9.0, 4.5) }
+    pine_2:  library.props.pine  { at: (-10.5, 3.0), height: 5.0 }
+    bush_1:  library.props.bush  { at: (1.5, 3.2) }
+    bush_2:  library.props.bush  { at: (-5.0, 3.0) }
+    fence_1: library.props.fence { at: (-1.5, 6.5) }
+    fence_2: library.props.fence { at: (1.5, 6.5) }
+    lamp_1:  library.props.lamp_post { at: (2.0, -1.5) }
+    bench_1: library.props.bench { at: (-3.0, 3.9), yaw: 180 }
+    rock_1:  library.props.rock  { at: (6.0, -4.0) }
+    car_1:   library.props.car   { at: (-4.0, -6.0), yaw: 90, color: #FFC93C }
+  }
+
+  solids {
+    well_base: { shape: cylinder, at: (0.0, 0.0), size: (1.4, 0.9, 1.4), color: #B5B9C4 }
+    well_roof: { shape: pyramid, at: (0.0, 0.0), y: 1.9, size: (1.9, 0.8, 1.9), color: #C0504D }
+    post_a:    { shape: box, at: (-0.6, 0.0), size: (0.1, 1.0, 0.1), y: 0.9, color: #8A5A34, solid: false }
+    post_b:    { shape: box, at: (0.6, 0.0), size: (0.1, 1.0, 0.1), y: 0.9, color: #8A5A34, solid: false }
+    hill_1:    { shape: sphere, at: (-8.0, 22.0), size: (26.0, 11.0, 14.0), color: #6CBF84 }
+    hill_2:    { shape: sphere, at: (10.0, 24.0), size: (30.0, 14.0, 14.0), color: #58B070 }
+    mountain:  { shape: cone, at: (0.0, 30.0), size: (22.0, 16.0, 22.0), color: #8E9AC8 }
+    snow:      { shape: cone, at: (0.0, 30.0), y: 11.5, size: (7.0, 4.5, 7.0), color: #FFFFFF }
+  }
+}

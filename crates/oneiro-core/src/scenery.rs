@@ -120,6 +120,13 @@ impl SetDef {
                         }
                     }
                 }
+                "solids" => {
+                    for se in e.block().unwrap_or(&[]) {
+                        if let Some(sd) = parse_solid(se, file, diags) {
+                            self.solids.push(sd);
+                        }
+                    }
+                }
                 "sprites" => {
                     for se in e.block().unwrap_or(&[]) {
                         if let Some(sp) = parse_sprite(se, file, diags) {
@@ -163,4 +170,69 @@ impl SetDef {
             load(root, &mut sp.art, &format!("sprite {}", sp.name), 640, label, at, diags);
         }
     }
+}
+
+// ------------------------------------------------------------------ solids: 3D shapes built by hand or by the AI
+
+pub const SOLID_SHAPES: &[&str] = &["box", "cylinder", "cone", "sphere", "roof", "pyramid"];
+
+/// A 3D shape standing in the set. Many of them make a house, a tower, a boat or a stage: real geometry, so any
+/// camera side sees it correctly.
+#[derive(Clone, Debug)]
+pub struct Solid {
+    pub name: String,
+    /// `box`, `cylinder`, `cone`, `sphere`, `roof` (a gabled roof), `pyramid`.
+    pub shape: String,
+    pub at: [f64; 2],
+    /// Height of its base above the ground.
+    pub y: f64,
+    /// Width (x), height (y) and depth (z) in meters, before `yaw`.
+    pub size: [f64; 3],
+    pub color: Rgb,
+    /// Rotation about the vertical axis, radians.
+    pub yaw: f64,
+    /// Characters walk around it (boxes and cylinders only).
+    pub solid: bool,
+}
+
+pub fn parse_solid(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Solid> {
+    let entries = match e.value()? {
+        Value::Map(en) | Value::Call(_, en) => en.clone(),
+        _ => {
+            diags.push(Diagnostic::error("E1150", file, e.pos, format!("solid '{}' must look like: {}: {{ shape: box, at: (x, z), size: (w, h, d), color: #AA7744 }}", e.key, e.key)));
+            return None;
+        }
+    };
+    let shape = entry(&entries, "shape").and_then(|x| x.value()).and_then(|v| v.as_str()).unwrap_or("box").to_string();
+    if !SOLID_SHAPES.contains(&shape.as_str()) {
+        diags.push(Diagnostic::error("E1151", file, e.pos, format!("unknown shape '{}'", shape)).suggest(did_you_mean(&shape, SOLID_SHAPES.iter().copied())));
+        return None;
+    }
+    let num = |k: &str| entry(&entries, k).and_then(|x| x.value()).and_then(|v| v.as_num());
+    let at = entry(&entries, "at").and_then(|x| x.value()).and_then(|v| v.nums()).filter(|n| n.len() == 2).map(|n| [n[0], n[1]]).unwrap_or([0.0, 0.0]);
+    let size = match entry(&entries, "size").and_then(|x| x.value()).and_then(|v| v.nums()) {
+        Some(n) if n.len() == 3 => [n[0], n[1], n[2]],
+        Some(n) if n.len() == 1 => [n[0], n[0], n[0]],
+        None => [1.0, 1.0, 1.0],
+        _ => {
+            diags.push(Diagnostic::error("E1152", file, e.pos, format!("solid '{}': size must be (width, height, depth) in meters", e.key)));
+            return None;
+        }
+    };
+    if size.iter().any(|s| !(0.01..=200.0).contains(s)) {
+        diags.push(Diagnostic::error("E1152", file, e.pos, format!("solid '{}': every size must be between 0.01 and 200 meters", e.key)));
+        return None;
+    }
+    let color = color_of(entry(&entries, "color").and_then(|x| x.value())).unwrap_or(Rgb(196, 190, 180));
+    let solid_default = matches!(shape.as_str(), "box" | "cylinder") && size[1] > 0.4;
+    Some(Solid {
+        name: e.key.clone(),
+        shape,
+        at,
+        y: num("y").unwrap_or(0.0),
+        size,
+        color,
+        yaw: num("yaw").unwrap_or(0.0).to_radians(),
+        solid: entry(&entries, "solid").and_then(|x| x.value()).and_then(|v| v.as_bool()).unwrap_or(solid_default),
+    })
 }

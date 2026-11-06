@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 const MARTA: &str = include_str!("../../../examples/first_short/library/characters/Marta.onchar");
 const BLOB: &str = include_str!("../../../examples/first_short/library/characters/Blob.onchar");
 const DINER: &str = include_str!("../../../examples/first_short/library/sets/diner.onset");
+const VILLAGE: &str = include_str!("../../../examples/village/library/sets/village.onset");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Template {
@@ -39,6 +40,18 @@ pub fn folder_name(title: &str) -> String {
 pub fn room_source(name: &str) -> String {
     format!(
         "# A bare room. Coordinates are meters: x east, z north, origin at the center of the floor.\nset {name} {{\n  size: 8m x 6m\n  height: 3m\n\n  palette {{\n    wall: #DCE6EE\n    wall_alt: #CFDBE6\n    floor: #B9A88C\n    floor_alt: #A8977B\n    trim: #4A6FA5\n  }}\n\n  anchors {{\n    start: (-3.0, -1.0)\n    center: (0.0, 0.0)\n  }}\n\n  props {{\n    window_1: library.props.window {{ wall: north, at: -1.5 }}\n    door:     library.props.door   {{ wall: west, at: -1.0 }}\n    table_1:  library.props.table  {{ at: (2.2, 0.8) }}\n  }}\n}}\n"
+    )
+}
+
+/// An open 3D village: houses, trees, a well and far hills.
+pub fn village_source(name: &str) -> String {
+    VILLAGE.replacen("set village {", &format!("set {} {{", name), 1)
+}
+
+/// An open field: sky, grass, a few trees and rocks, and room to build.
+pub fn field_source(name: &str) -> String {
+    format!(
+        "# An open field in 3D. Add props (tree, pine, bush, rock, house, fence, bench...) and solids (box, cylinder, cone, sphere, roof, pyramid).\nset {name} {{\n  kind: open\n  size: 16m x 12m\n  sky: [#5BC0F8, #FFEFC4]\n  ground: #8ED081\n\n  anchors {{\n    start: (-5.0, -2.0)\n    center: (0.0, 0.0)\n  }}\n\n  props {{\n    tree_1: library.props.tree {{ at: (-7.0, 3.0) }}\n    tree_2: library.props.tree {{ at: (7.5, 4.0), height: 4.4 }}\n    pine_1: library.props.pine {{ at: (-9.0, -1.0) }}\n    bush_1: library.props.bush {{ at: (3.0, 3.0) }}\n    rock_1: library.props.rock {{ at: (5.0, -3.0) }}\n  }}\n\n  solids {{\n    hill_1: {{ shape: sphere, at: (-6.0, 20.0), size: (24.0, 9.0, 12.0), color: #6CBF84 }}\n    hill_2: {{ shape: sphere, at: (10.0, 22.0), size: (26.0, 12.0, 12.0), color: #58B070 }}\n  }}\n}}\n"
     )
 }
 

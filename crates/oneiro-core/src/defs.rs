@@ -512,6 +512,7 @@ pub struct SetDef {
     pub ground: Rgb,
     pub backdrops: BTreeMap<String, crate::scenery::Scenery>,
     pub sprites: Vec<crate::scenery::Sprite>,
+    pub solids: Vec<crate::scenery::Solid>,
 }
 
 pub fn dir_yaw(name: &str) -> Option<f64> {
@@ -552,6 +553,7 @@ impl SetDef {
             ground: Rgb(226, 208, 150),
             backdrops: BTreeMap::new(),
             sprites: Vec::new(),
+            solids: Vec::new(),
         };
         for e in &b.entries {
             match e.key.as_str() {
@@ -910,7 +912,7 @@ fn look_of(entries: &[Entry], file: &str, pos: Pos, diags: &mut Vec<Diagnostic>)
 impl SetDef {
     /// True when this prop is drawn as a 3D mesh.
     pub fn prop_is_3d(&self, p: &PropInst) -> bool {
-        p.kind == "model" || p.look.as_deref().unwrap_or(&self.look) == "toon_3d"
+        p.kind == "model" || crate::catalog::STOCK_3D_PROPS.contains(&p.kind.as_str()) || p.look.as_deref().unwrap_or(&self.look) == "toon_3d"
     }
 }
 

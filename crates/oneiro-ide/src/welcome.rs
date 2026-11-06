@@ -93,7 +93,8 @@ pub enum QuickKind {
 pub struct Quick {
     pub kind: QuickKind,
     pub name: String,
-    pub diner: bool,
+    /// 0 bare room, 1 diner, 2 open field, 3 village.
+    pub template: usize,
     pub set: String,
     pub cast: Vec<(String, bool)>,
     pub error: Option<String>,
@@ -248,7 +249,7 @@ impl App {
                 QuickKind::Set => format!("set_{}", n),
                 QuickKind::Episode => format!("episode_{}", n),
             },
-            diner: false,
+            template: 0,
             set: sets.first().cloned().unwrap_or_default(),
             cast,
             error: None,
@@ -268,8 +269,9 @@ impl App {
             ui.label(RichText::new(tr("letters, digits and _ (it is also the file name)")).weak().small());
             match q.kind {
                 QuickKind::Set => {
-                    ui.radio_value(&mut q.diner, false, tr("Bare room (8 x 6 m, a window, a door and a table)"));
-                    ui.radio_value(&mut q.diner, true, tr("Diner (counter, stools, clock, pie case)"));
+                    for (i, label) in [tr("Bare room (8 x 6 m, a window, a door and a table)"), tr("Diner (counter, stools, clock, pie case)"), tr("Open field (sky and grass, no walls, build your own 3D world)"), tr("Village (houses, trees, a well and hills in 3D)")].into_iter().enumerate() {
+                        ui.radio_value(&mut q.template, i, label);
+                    }
                 }
                 QuickKind::Episode => {
                     egui::ComboBox::from_label(tr("Set")).selected_text(q.set.clone()).show_ui(ui, |ui| {
@@ -317,7 +319,12 @@ impl App {
                 if path.exists() || ws.project.sets.contains_key(&q.name) {
                     return Err(format!("a set called '{}' already exists", q.name));
                 }
-                let text = if q.diner { scaffold::diner_source(&q.name) } else { scaffold::room_source(&q.name) };
+                let text = match q.template {
+                    1 => scaffold::diner_source(&q.name),
+                    2 => scaffold::field_source(&q.name),
+                    3 => scaffold::village_source(&q.name),
+                    _ => scaffold::room_source(&q.name),
+                };
                 std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
                 std::fs::write(&path, text).map_err(|e| e.to_string())?;
                 ws.reload_project();

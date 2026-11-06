@@ -150,66 +150,68 @@ Rules:
 "#;
 
 /// How to author an open set (a beach, a forest, a street) from SVG pictures.
-pub const SET_GUIDE: &str = r##"# Oneiro open sets (scenery drawn as pictures)
+pub const SET_GUIDE: &str = r##"# Oneiro open sets (a scenario built from real 3D pieces)
 
-A scenario is NOT a room: it is a sky, a ground, a painted BACKDROP on each of the four sides (so the camera can film
-from any side) and SPRITES (flat pictures standing in the world: trees, rocks, boats, birds, a sun) that always face the
-camera and can move. Like classic cartoons: painted backgrounds with a few animated things. Reply with ONE `set`
-block and one SVG block per picture it uses.
+A scenario is NOT a closed room: it is a sky, a ground and a world built from 3D PIECES in the toon style (cel shading and ink
+outlines), so the camera can film from any side and nothing is a flat wall. You build it from three kinds of things, and
+may add pictures for far-away decoration. Reply with ONE `set` block (plus one SVG block per picture, only if you use pictures).
 
 ```onset
-set beach {
+set village {
   kind: open
-  size: 16m x 12m
-  sky: [#4CC3FF, #FFF3C9]
-  ground: #F0D58C
-  backdrops {
-    north: "backdrop_north"
-    east: "backdrop_east"
-    south: "backdrop_south"
-    west: "backdrop_west"
-  }
+  size: 18m x 14m
+  sky: [#5BC0F8, #FFEFC4]
+  ground: #8ED081
   anchors {
-    start: (-5.0, -2.0)
-    center: (0.0, 0.0)
-    shore: (0.0, 4.0)
+    start: (-6.0, -3.0)
+    center: (0.0, -1.8)
+    bench: (-3.0, 3.5)
   }
-  sprites {
-    palm_1: { image: "sprite_palm", at: (-6.5, 3.5), height: 5.0, anim: sway, speed: 0.8 }
-    gull_1: { image: "sprite_gull", at: (-3.0, 7.0), height: 0.9, y: 4.5, anim: bob, speed: 1.4 }
+  props {
+    house_1: library.props.house { at: (4.0, 5.0), yaw: 180 }
+    tree_1: library.props.tree { at: (-9.0, -1.0), height: 4.4 }
+    pine_1: library.props.pine { at: (9.0, 4.5) }
+    bench_1: library.props.bench { at: (-3.0, 3.9), yaw: 180 }
+    lamp_1: library.props.lamp_post { at: (2.0, -1.5) }
+    car_1: library.props.car { at: (-4.0, -6.0), yaw: 90, color: #FFC93C }
+  }
+  solids {
+    well_base: { shape: cylinder, at: (0.0, 0.0), size: (1.4, 0.9, 1.4), color: #B5B9C4 }
+    well_roof: { shape: pyramid, at: (0.0, 0.0), y: 1.9, size: (1.9, 0.8, 1.9), color: #C0504D }
+    hill_1: { shape: sphere, at: (-8.0, 22.0), size: (26.0, 11.0, 14.0), color: #6CBF84 }
+    mountain: { shape: cone, at: (0.0, 30.0), size: (22.0, 16.0, 22.0), color: #8E9AC8 }
   }
 }
 ```
 
-```svg backdrop_north
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 600"> ... </svg>
-```
-(one `svg NAME` block for every name used in `backdrops` and `image:`; a name is used once even if several sprites share it)
-
 Rules (the engine checks them and tells you what is wrong):
-- `kind: open`. `size` is the PLAY AREA in meters (usually 14m x 10m to 20m x 14m): where characters walk. x is east, z is
-  north, (0, 0) is the center. Anchors are named points inside it (at least `start` and `center`); scripts use
-  `place Marta at beach.start`, `walks_to beach.shore`, `camera wide from east`.
-- `sky: [top, horizon]` two colors (or one). `ground: #RRGGBB` the floor color. Both are flat; the backdrops go on top.
-- Backdrops: the four pictures stand around the play area, each seen from inside: `north` is what you see looking
-  north, and so on. They must be WIDE (viewBox ratio between 1.8 and 4.5; use `viewBox="0 0 1600 600"`). The BOTTOM edge of
-  the picture meets the ground at the horizon, so draw the scenery rising from the bottom and leave the sky area empty
-  (transparent): the sky gradient shows through. Fill the whole bottom with ground, water, hills or buildings; do not leave
-  a gap at the bottom. Make the four sides different but matching (a beach: sea to the north, cliffs east, jungle west,
-  a boardwalk with shops south). Where two sides meet, the pictures should not clash in height too much.
-- Sprites: `image: "NAME"`, `at: (x, z)` on the ground (stand them around and just outside the play area to give depth:
-  trees at the edges, a rock near the middle), `height` in meters (a tree 4-6, a person-sized thing 1.7, a crab 0.3, a
-  bird 0.8), `y` lift above the ground in meters (birds and suns 3-8), `flip: true` mirrors it. `anim` is one of
-  `none`, `sway` (trees in the wind, rocks about the base), `bob` (up and down: birds, boats, buoys), `pulse` (breathes:
-  a sun, a lamp), `spin` (turns in place: a windmill, a coin); `speed` (0.3-3) and `amount` (0.3-2) tune it. 6 to 14
-  sprites is plenty; animate only a few.
-- Each sprite picture is a standalone SVG with a `viewBox`; the drawing FILLS it and its bottom edge is where it touches
-  the ground (so leave no empty space at the bottom).
-- Allowed SVG: `svg g path rect circle ellipse line polyline polygon` with `fill`, `stroke`, `stroke-width`, `opacity`,
-  `transform`. Colors as `#RRGGBB`. NOT allowed: gradients, filters, text, images, `use`, scripts, CSS, clip paths, masks.
-  Use bold flat colors with a dark outline (stroke 4-6 units on a 1600-wide backdrop) and a few shapes per object:
-  colorful, simple, readable, in the style of a modern cartoon. At most 600 shapes per picture.
-- Picture names: letters, digits and underscores, NO path and NO extension; Oneiro saves the files for you.
+- `kind: open`. `size` is the PLAY AREA in meters (14m x 10m to 24m x 18m): where characters walk. x is east, z is north,
+  (0, 0) is the center. Anchors are named points inside it (at least `start` and `center`); scripts use
+  `place Marta at village.start`, `walks_to village.bench`, `camera wide from east`. Keep the area around the anchors FREE of
+  big pieces so people can walk; put big things (houses, trees, hills) at the edges and beyond.
+- `sky: [top, horizon]` and `ground: #RRGGBB` are flat colors; everything else is real geometry.
+- STOCK PROPS (`library.props.KIND { at: (x, z), yaw: degrees, height/width/depth: meters, color: #RRGGBB }`): tree, pine, bush,
+  rock, house, fence, lamp_post, bench, sofa, bed, bookshelf, tv, car, rug, and the old room ones: table, stool, counter. A
+  prop's default size is a good one; scale it with `height`, `width`, `depth`. Use `yaw` so houses face the action (a house's
+  door is on its local +z side: yaw 180 makes it face south). `color` recolors the main part.
+- SOLIDS build anything else from primitives: `shape` is box, cylinder, cone, sphere, roof (a gabled roof), pyramid; `at: (x, z)`,
+  `y` = height of its base above the ground, `size: (width, height, depth)` in meters, `yaw` in degrees, `color`. A cylinder
+  uses the width as its diameter. A sphere is an ellipsoid (use a flat wide size for a hill, a tall one for a bush).
+  `solid: true/false` decides whether people walk around it (boxes and cylinders are obstacles by default).
+  Compose them: a shop = a box + a roof + a box door + boxes for windows + a sign; a boat = a flat box hull + a cone sail; a
+  castle = boxes and cylinder towers with cone roofs; a lighthouse = a stack of cylinders with a cone top and a yellow sphere.
+  Hills and mountains far away (z 20-40) are big spheres and cones: they give depth and a horizon.
+- An INTERIOR is the same idea: `kind: open` with a floor color for `ground`, `box` solids as walls (thin and tall) with gaps for
+  doors, and furniture props. Leave one side open for the camera or film from outside; it need not be closed.
+- Use 12 to 60 pieces; vary sizes, colors and heights; group things (a few trees together, a fence along a path); put small
+  props near the anchors and large ones far. Colors: bold and cheerful, like a modern cartoon. Do not stack pieces so that
+  they overlap by accident.
+- OPTIONAL PICTURES (far decoration, birds, a sun): `backdrops { north: "name" }` (a wide SVG, viewBox ratio 1.8 to 4.5, bottom
+  edge on the ground, transparent sky) and `sprites { id: { image: "name", at: (x, z), height: m, y: m, anim: sway } }` with
+  `anim` none, sway, bob, pulse or spin. Each name needs an ```svg NAME block (allowed: svg g path rect circle ellipse line
+  polyline polygon, flat `#RRGGBB` colors, no gradients/text/filters). Prefer 3D pieces; use pictures only for what 3D cannot
+  do well (clouds, birds, a far skyline).
+- Names of pieces: letters, digits, underscores. Do not write file paths: Oneiro saves pictures for you.
 "##;
 
 /// How to author a character from vector parts (tier B).
