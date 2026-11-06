@@ -10,6 +10,7 @@ pub mod build;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 pub mod mesh;
+pub mod props;
 pub mod raster;
 
 pub use build::{character_mesh, Built};

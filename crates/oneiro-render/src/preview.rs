@@ -24,6 +24,7 @@ pub fn plain_set() -> SetDef {
         floor: Rgb(196, 200, 212),
         floor_alt: Rgb(188, 192, 206),
         trim: Rgb(150, 156, 178),
+        look: "flat".into(),
     }
 }
 

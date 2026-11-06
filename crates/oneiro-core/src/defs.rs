@@ -484,6 +484,8 @@ pub struct PropInst {
     pub color: Option<Rgb>,
     /// `solid: true` makes any prop an obstacle people walk around; `solid: false` lets them through.
     pub solid: Option<bool>,
+    /// `look: toon_3d` draws this prop as a real 3D mesh; `look: flat` keeps the 2D drawing.
+    pub look: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -499,6 +501,8 @@ pub struct SetDef {
     pub floor: Rgb,
     pub floor_alt: Rgb,
     pub trim: Rgb,
+    /// Default look of the props: `flat` (2D) or `toon_3d`.
+    pub look: String,
 }
 
 pub fn dir_yaw(name: &str) -> Option<f64> {
@@ -533,6 +537,7 @@ impl SetDef {
             floor: Rgb(222, 216, 200),
             floor_alt: Rgb(52, 52, 66),
             trim: Rgb(150, 40, 48),
+            look: "flat".into(),
         };
         for e in &b.entries {
             match e.key.as_str() {
@@ -547,6 +552,11 @@ impl SetDef {
                 "height" => {
                     if let Some(n) = e.value().and_then(|v| v.as_num()) {
                         s.height = n;
+                    }
+                }
+                "look" => {
+                    if let Some(l) = look_of(std::slice::from_ref(e), file, e.pos, diags) {
+                        s.look = l;
                     }
                 }
                 "palette" => {
@@ -683,6 +693,7 @@ fn parse_prop(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Prop
         d: None,
         color: None,
         solid: None,
+        look: None,
     };
     let num = |k: &str| entry(&entries, k).and_then(|x| x.value()).and_then(|v| v.as_num());
     match entry(&entries, "at").and_then(|x| x.value()) {
@@ -714,6 +725,8 @@ fn parse_prop(e: &Entry, file: &str, diags: &mut Vec<Diagnostic>) -> Option<Prop
     p.d = num("depth");
     p.color = color_of(entry(&entries, "color").and_then(|x| x.value()));
     p.solid = entry(&entries, "solid").and_then(|x| x.value()).and_then(|v| v.as_bool());
+    p.look = look_of(&entries, file, e.pos, diags);
+    p.look = look_of(&entries, file, e.pos, diags);
     Some(p)
 }
 
@@ -854,5 +867,24 @@ impl CharacterDef {
         }
         s.push_str("}\n");
         s
+    }
+}
+
+/// Reads a `look: flat | toon_3d` entry (props and sets).
+fn look_of(entries: &[Entry], file: &str, pos: Pos, diags: &mut Vec<Diagnostic>) -> Option<String> {
+    match entry(entries, "look").and_then(|x| x.value()) {
+        Some(Value::Ident(l)) if l == "flat" || l == "toon_3d" => Some(l.clone()),
+        Some(Value::Ident(l)) => {
+            diags.push(Diagnostic::error("E1120", file, pos, format!("unknown look '{}'", l)).suggest("looks: flat, toon_3d"));
+            None
+        }
+        _ => None,
+    }
+}
+
+impl SetDef {
+    /// True when this prop is drawn as a 3D mesh.
+    pub fn prop_is_3d(&self, p: &PropInst) -> bool {
+        p.look.as_deref().unwrap_or(&self.look) == "toon_3d"
     }
 }
