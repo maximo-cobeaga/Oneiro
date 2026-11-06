@@ -2,6 +2,7 @@
 
 
 mod ai_cmds;
+mod new_cmd;
 mod audio_cmds;
 mod cut_cmds;
 
@@ -19,6 +20,7 @@ const USAGE: &str = "\
 oneiro 0.1 - a language and studio for animated series
 
 USAGE:
+  oneiro new <dir> [--name NAME]   scaffold a project that renders out of the box
   oneiro check <project|script.onr> [--json]
   oneiro render <project|script.onr> [-o out.mp4] [--preview] [--res WxH] [--fps N]
                 [--no-audio] [--hash] [--png-dir DIR] [--no-write] [--3d cpu|gpu|auto]
@@ -164,6 +166,7 @@ fn main() -> ExitCode {
     };
     let rest = &args[1..];
     let result = match cmd.as_str() {
+        "new" => new_cmd::cmd_new(rest),
         "check" => cmd_check(rest),
         "render" => cmd_render(rest),
         "still" => cmd_still(rest),
@@ -409,6 +412,7 @@ fn cmd_vocab(args: &[String]) -> Result<bool, String> {
         ("rigs", RIGS.to_vec()),
         ("wardrobe", wardrobe),
         ("props", PROP_KINDS.to_vec()),
+        ("transitions", TRANSITIONS.to_vec()),
         ("styles", STYLES.to_vec()),
         ("styles_planned", PLANNED_STYLES.to_vec()),
         ("svg_parts", SVG_PARTS.to_vec()),

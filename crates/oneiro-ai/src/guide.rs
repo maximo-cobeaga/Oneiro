@@ -81,7 +81,7 @@ scene 1 "Late order" in diner {
   previous one); `music stop [fade_out 2s]` ends it. Music ducks automatically under dialogue. Use only sounds from the
   list below; when you need one that is missing, create it first (the `generate_sound` tool, or `oneiro sound`).
 - Styles are per character: `style default: cutout_2d` sets the episode's look, and `use character Blob style rubber_hose`
-  draws that one character differently (cutout_2d, rubber_hose, clay). Different styles can share a scene. Only change
+  draws that one character differently (cutout_2d, rubber_hose, clay, ink, toon_3d). Different styles can share a scene. Only change
   styles when the user asks for a look.
 - Floor points `(x, z)` in meters are valid targets: `Blob walks_to (1.5, 0.5)` (x east, z north, origin at the
   center of the set, whose size is given below).
@@ -92,6 +92,7 @@ scene 1 "Late order" in diner {
 
 - Open a scene with a wide or establishing shot, then move in (medium, close) as the dialogue starts.
 - For two people talking, alternate `camera over_shoulder A -> B` and `camera over_shoulder B -> A`, with
+- Between two shots, `transition dissolve for 1s` (also fade_black, fade_white, wipe_left, wipe_right) goes on the line before the `camera`/`cut to` it applies to.
   `cut to close on X` for emotional beats. The engine keeps the shots on one side of the action (180-degree rule).
 - Give the audience time: `wait 1s` after a punchline, a held shot before a camera move.
 - Use gestures and expressions sparingly and on purpose (a shrug, crossed arms, `emote surprised`).
@@ -140,7 +141,7 @@ Rules:
 - `body` is kid, adult or round (`height` 0.6-1.6, optional `width` 0.7-1.5).
 - `wardrobe` takes at most one item per slot (hat, top, bottom, shoes, accessory), only from the list below.
 - `voice pitch` is in Hz (70-400): low for big/older characters, high for small/young ones.
-- Optional `style: toon_3d` makes the character a real 3D toon figure (other styles: cutout_2d, rubber_hose, clay), and
+- Optional `style: toon_3d` makes the character a real 3D toon figure (other styles: cutout_2d, rubber_hose, clay, ink), and
   `toon3d { cape: #C02030, tail: #E0782A }` adds a cloth cape and/or a springy tail (physics, 3D style only).
 - Be faithful to the user's description; make unspecified choices that fit the character's personality.
 "#;

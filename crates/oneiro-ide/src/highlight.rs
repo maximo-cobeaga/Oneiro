@@ -23,7 +23,7 @@ pub enum Tok {
 const KEYWORDS: &[&str] = &[
     "oneiro", "project", "style", "default", "use", "scene", "in", "place", "at", "facing", "camera", "cut", "to", "on",
     "from", "angle", "move", "lens", "for", "wait", "together", "sfx", "music", "audio", "volume", "fade_in", "fade_out", "once", "stop", "and", "give",
-    "wound", "relation", "remember", "character", "set", "time", "intensity", "away",
+    "transition", "wound", "relation", "remember", "character", "set", "time", "intensity", "away",
 ];
 
 pub fn classify(word: &str) -> Tok {

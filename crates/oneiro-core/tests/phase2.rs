@@ -99,8 +99,12 @@ fn placing_at_a_solid_anchor_stands_in_front_of_it_facing_it() {
     assert!(d.iter().all(|x| !x.is_error()), "{:?}", d);
     let blob = ep.scenes[0].actors.iter().find(|a| a.name == "Blob").unwrap();
     let counter = [0.0, 2.35];
-    let dist = dist2(blob.init_pos, counter);
-    assert!((dist - 0.75).abs() < 1e-6, "stands {} m from the counter", dist);
+    // A body width away from the counter's footprint (not from its center): the body never touches it.
+    let obs = oneiro_core::nav::footprints(&project().sets["diner"]);
+    let counter_box = obs.iter().find(|(n, _)| n == "counter").unwrap().1;
+    let r = oneiro_core::nav::radius(&blob.def);
+    assert!(!counter_box.inflate(r).contains(blob.init_pos), "Blob overlaps the counter at {:?}", blob.init_pos);
+    assert!(counter_box.inflate(r + 0.3).contains(blob.init_pos), "and stands close to it, at {:?}", blob.init_pos);
     assert!(blob.init_pos[1] < counter[1], "in front of the counter, not behind it");
     // facing the counter (north)
     assert!(angle_diff(blob.init_yaw, 0.0).abs() < 0.2, "yaw {}", blob.init_yaw);

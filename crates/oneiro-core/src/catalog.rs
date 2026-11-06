@@ -12,8 +12,8 @@ pub const RIGS: &[&str] = &["biped_cutout"];
 /// Visual styles a character can be drawn in. `cutout_2d` is the South Park-like paper cutout,
 /// `rubber_hose` the 1930s noodle-limbed look, `clay` a stop-motion plasticine look applied on top
 /// of the character's own drawing. Styles are chosen per character, so one scene can mix them.
-pub const STYLES: &[&str] = &["cutout_2d", "rubber_hose", "clay", "toon_3d"];
-pub const PLANNED_STYLES: &[&str] = &["ink"];
+pub const STYLES: &[&str] = &["cutout_2d", "rubber_hose", "clay", "ink", "toon_3d"];
+pub const PLANNED_STYLES: &[&str] = &[];
 /// Parts of a vector (SVG) character, in the order they must be provided.
 pub const SVG_PARTS: &[&str] = &["head", "body", "arm", "leg"];
 
@@ -92,6 +92,8 @@ pub const MOVES: &[&str] = &[
 ];
 pub const SIDES: &[&str] = &["north", "south", "east", "west", "left", "right", "front", "back"];
 pub const TIMES: &[&str] = &["day", "dusk", "night"];
+/// `transition KIND [for 1s]` before a camera change blends the shots across the cut.
+pub const TRANSITIONS: &[&str] = &["dissolve", "fade_black", "fade_white", "wipe_left", "wipe_right"];
 pub const RELATIONS: &[&str] = &["at", "beside", "left_of", "right_of", "in_front_of", "behind", "near"];
 pub const PLANNED_RELATIONS: &[&str] = &["on", "inside"];
 

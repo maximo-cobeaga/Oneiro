@@ -178,3 +178,9 @@ and 3D characters in sets other than the diner.
 Known limitations: only block characters become real 3D (vector and cut-out characters stay flat puppets); the set and props are
 still 2D (no 3D shadows between them and characters); physics is limited to the cape and the tail; simple procedural meshes, no
 imported models or textures.
+
+## Phase 8 results (polish)
+
+Done: walking around furniture (fixes the waiter inside the bar), `transition` between shots (dissolve, fade_black, fade_white,
+wipe_left, wipe_right), the `ink` style, `oneiro new`, and soft 3D character shadows. Details, tests (187 green) and limitations
+in [11-polish.md](11-polish.md).
