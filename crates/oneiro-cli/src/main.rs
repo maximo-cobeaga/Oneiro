@@ -21,7 +21,7 @@ const USAGE: &str = "\
 oneiro 0.1 - a language and studio for animated series
 
 USAGE:
-  oneiro new <dir> [--name NAME]   scaffold a project that renders out of the box
+  oneiro new <dir> [--name NAME] [--template starter|empty]   scaffold a project
   oneiro doctor                      what works on this machine (ffmpeg, GPU, voices, AI tools)
   oneiro check <project|script.onr> [--json]
   oneiro render <project|script.onr> [-o out.mp4] [--preview] [--res WxH] [--fps N]

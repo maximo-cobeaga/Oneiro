@@ -46,6 +46,8 @@ pub struct ExportJob {
 #[derive(Default, Clone)]
 pub struct StartupOpts {
     pub project: Option<PathBuf>,
+    pub demo_quick: Option<String>,
+    pub demo_new: bool,
     pub screenshot: Option<PathBuf>,
     pub after_frames: u64,
     pub time: Option<f64>,
@@ -112,6 +114,9 @@ pub struct App {
     pub frame_counter: u64,
     pub screenshot_requested: bool,
     pub ai_phase: u8,
+    pub recent: Vec<PathBuf>,
+    pub new_project: Option<crate::welcome::NewProject>,
+    pub quick: Option<crate::welcome::Quick>,
 }
 
 const RES: [(&str, u32, u32); 3] = [("Preview 640x360", 640, 360), ("HD 1280x720", 1280, 720), ("Full HD 1920x1080", 1920, 1080)];
@@ -122,7 +127,7 @@ impl App {
         let mut app = App {
             ws: None,
             error: None,
-            status: "Open a project to start (File > Open project...)".into(),
+            status: "Create or open a project to start".into(),
             t: 0.0,
             playing: false,
             looping: true,
@@ -152,6 +157,9 @@ impl App {
             frame_counter: 0,
             screenshot_requested: false,
             ai_phase: 0,
+            recent: crate::welcome::load_recent(),
+            new_project: None,
+            quick: None,
         };
         if let Some(p) = &startup.project {
             app.open_project(p);
@@ -183,6 +191,8 @@ impl App {
         match Workspace::open(path) {
             Ok(ws) => {
                 self.status = format!("Opened {}", ws.root.display());
+                let root = ws.root.clone();
+                self.remember_project(&root);
                 self.error = None;
                 self.t = 0.0;
                 self.playing = false;
@@ -277,6 +287,13 @@ impl App {
         if save {
             self.save_all();
         }
+        let (new_p, open_p) = ctx.input(|i| (i.modifiers.command && i.key_pressed(egui::Key::N), i.modifiers.command && i.key_pressed(egui::Key::O)));
+        if new_p {
+            self.new_project = Some(crate::welcome::NewProject::new());
+        }
+        if open_p {
+            self.pick_and_open();
+        }
         if esc && self.recorder.is_some() {
             self.recorder = None;
             self.status = "Recording cancelled".into();
@@ -357,12 +374,27 @@ impl App {
     fn menu(&mut self, ui: &mut egui::Ui) {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
-                if ui.button("Open project...").clicked() {
-                    if let Some(p) = rfd::FileDialog::new().set_title("Open an Oneiro project folder").pick_folder() {
-                        self.open_project(&p);
-                    }
+                if ui.button("New project...      Ctrl+N").clicked() {
+                    self.new_project = Some(crate::welcome::NewProject::new());
                     ui.close();
                 }
+                if ui.button("Open project...     Ctrl+O").clicked() {
+                    self.pick_and_open();
+                    ui.close();
+                }
+                ui.add_enabled_ui(!self.recent.is_empty(), |ui| {
+                    ui.menu_button("Open recent", |ui| {
+                        let list = self.recent.clone();
+                        for p in list {
+                            let label = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                            if ui.button(label).on_hover_text(p.display().to_string()).clicked() {
+                                self.open_project(&p);
+                                ui.close();
+                            }
+                        }
+                    });
+                });
+                ui.separator();
                 if ui.add_enabled(self.ws.is_some(), egui::Button::new("Save all      Ctrl+S")).clicked() {
                     self.save_all();
                     ui.close();
@@ -606,6 +638,14 @@ impl eframe::App for App {
         self.sync_audio();
 
         egui::Panel::top("menu").show(ui, |ui| self.menu(ui));
+        if self.ws.is_none() {
+            egui::Panel::bottom("status").show(ui, |ui| self.status_bar(ui));
+            egui::CentralPanel::default().show(ui, |ui| self.ui_welcome(ui));
+            self.new_project_window(&ctx);
+            self.run_startup_script(&ctx);
+            self.handle_startup_screenshot(&ctx);
+            return;
+        }
         egui::Panel::top("transport").show(ui, |ui| self.transport(ui));
         egui::Panel::bottom("status").show(ui, |ui| self.status_bar(ui));
         egui::Panel::bottom("timeline").resizable(true).default_size(210.0).min_size(120.0).show(ui, |ui| self.ui_timeline(ui));
@@ -616,6 +656,8 @@ impl eframe::App for App {
         self.export_window(&ctx);
         self.take_window(&ctx);
         self.help_window(&ctx);
+        self.new_project_window(&ctx);
+        self.quick_window(&ctx);
         self.run_startup_script(&ctx);
         self.run_ai_startup(&ctx);
         self.handle_startup_screenshot(&ctx);
@@ -627,6 +669,14 @@ impl App {
     pub fn run_startup_script(&mut self, ctx: &egui::Context) {
         let f = self.frame_counter;
         if f == 5 {
+            match self.startup.demo_quick.as_deref() {
+                Some("set") => self.start_quick(crate::welcome::QuickKind::Set),
+                Some("episode") => self.start_quick(crate::welcome::QuickKind::Episode),
+                _ => {}
+            }
+            if self.startup.demo_new {
+                self.new_project = Some(crate::welcome::NewProject::new());
+            }
             if let Some(text) = self.startup.demo_insert.clone() {
                 self.right_tab = RightTab::Script;
                 self.insert_request = Some(text);

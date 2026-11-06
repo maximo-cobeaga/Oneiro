@@ -189,3 +189,14 @@ in [11-polish.md](11-polish.md).
 
 Phase 9 solid props and time-of-day shadows, 10 3D props, 11 imported OBJ models, 12 paper-doll characters in `toon_3d`,
 13 `oneiro doctor`, `examples/showcase` and QUICKSTART. Details and limitations in [12-world.md](12-world.md).
+
+## Phase 14 results (launcher)
+
+Oneiro Studio is now a double-clickable program: a start screen (new project, open project, recent projects, examples),
+`File > New project` with two templates (starter, empty), `+ New set` and `+ New episode` in the library, no console window,
+an icon, and `tools\package.ps1` that builds `dist\Oneiro` and creates Desktop and Start Menu shortcuts. A step-by-step test
+route for a story from zero is in [13-first-story.md](13-first-story.md).
+
+**Not verified:** the native folder-picker dialogs (Browse, Open project) were not clicked by me, only the screens and the
+creation logic were tested; the exe has no embedded file icon (the window icon is set in code); it is unsigned, so Windows
+SmartScreen may warn the first time.
