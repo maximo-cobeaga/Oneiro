@@ -351,12 +351,15 @@ impl App {
     }
 }
 
+pub static TEST_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn recent_projects_are_remembered_most_recent_first_without_duplicates() {
+        let _g = TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let dir = std::env::temp_dir().join(format!("oneiro_recent_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let mk = |n: &str| {

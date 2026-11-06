@@ -19,3 +19,6 @@ eframe = "0.37"
 rfd = "0.17"
 tiny-skia = "0.11"
 oneiro-cutter = { path = "../oneiro-cutter" }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory"] }

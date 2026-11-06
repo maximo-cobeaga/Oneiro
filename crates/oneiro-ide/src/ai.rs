@@ -58,6 +58,7 @@ pub struct AiJob {
 pub struct AiState {
     pub cfg: AiConfig,
     pub session_key: String,
+    pub key_msg: String,
     pub mode: AiMode,
     pub input: String,
     pub chat: Vec<ChatItem>,
@@ -74,6 +75,7 @@ impl Default for AiState {
         AiState {
             cfg: AiConfig::load(),
             session_key: String::new(),
+            key_msg: String::new(),
             mode: AiMode::Scene,
             input: String::new(),
             chat: vec![ChatItem::Info("Describe what you want. For example: \"add a scene where Blob drops the pie and Marta laughs\", \"make the ending funnier\" or \"cut it to 20 seconds\". Nothing is changed until you press Apply.".into())],
@@ -395,10 +397,9 @@ The scenery still has problems:
                             ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.api_key_env).hint_text(tr("ANTHROPIC_API_KEY")));
                         });
                         ui.horizontal(|ui| {
-                            ui.label(tr("or key (this session only)"));
-                            ui.add(egui::TextEdit::singleline(&mut self.ai.session_key).password(true).desired_width(160.0));
+                            ui.label(tr("API key"));
                         });
-                        ui.label(RichText::new(tr("Keys are never saved to disk.")).weak().small());
+                        crate::keystore::key_row(ui, &mut self.ai.session_key, "ai", &mut self.ai.key_msg);
                     }
                     ProviderKind::OpenAiCompatible => {
                         ui.horizontal(|ui| {

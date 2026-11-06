@@ -9,6 +9,7 @@ mod editor;
 mod highlight;
 mod i18n;
 mod inspector;
+mod keystore;
 mod library;
 mod logo;
 mod record;

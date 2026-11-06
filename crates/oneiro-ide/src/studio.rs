@@ -85,6 +85,7 @@ pub struct AudioState {
     pub review: Option<Review>,
     pub cfg: VoiceConfig,
     pub session_key: String,
+    pub key_msg: String,
     pub show_settings: bool,
     pub gen_provider: ProviderKind,
     /// Use each character's own voice (its provider and voice id) instead of one provider for everybody.
@@ -142,6 +143,7 @@ impl Default for AudioState {
             ctx: None,
             cfg,
             session_key: String::new(),
+            key_msg: String::new(),
             show_settings: false,
             job: None,
             reports: vec![],
@@ -1113,8 +1115,8 @@ impl App {
                 ui.label(tr("key variable"));
                 ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.elevenlabs_key_env).hint_text(tr("ELEVENLABS_API_KEY")));
                 ui.end_row();
-                ui.label(tr("key (this session)"));
-                ui.add(egui::TextEdit::singleline(&mut self.audio.session_key).password(true));
+                ui.label(tr("API key"));
+                crate::keystore::key_row(ui, &mut self.audio.session_key, "elevenlabs", &mut self.audio.key_msg);
                 ui.end_row();
                 ui.label(tr("model"));
                 ui.add(egui::TextEdit::singleline(&mut self.audio.cfg.elevenlabs_model));

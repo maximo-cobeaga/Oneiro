@@ -186,6 +186,12 @@ impl App {
                 app.builder.select(app.ws.as_ref(), name);
             }
         }
+        if let Some(k) = crate::keystore::load("elevenlabs") {
+            app.audio.session_key = k;
+        }
+        if let Some(k) = crate::keystore::load("ai") {
+            app.ai.session_key = k;
+        }
         app.vp.free = startup.free_cam;
         app
     }
