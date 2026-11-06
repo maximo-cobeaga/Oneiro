@@ -82,3 +82,17 @@ fn a_bad_look_is_reported() {
     let _ = oneiro_core::SetDef::from_block(&file.blocks[0], "diner.onset", &mut d);
     assert!(d.iter().any(|x| x.code == "E1120"), "{:?}", d.iter().map(|x| x.render()).collect::<Vec<_>>());
 }
+
+#[test]
+fn obj_models_show_up_in_the_render() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/models_demo").canonicalize().unwrap();
+    let mut d = vec![];
+    let p = Project::load(&root, &mut d);
+    let text = std::fs::read_to_string(root.join("script.onr")).unwrap();
+    let (e, d) = compile_source(&p, "script.onr", &text, &Lock::default());
+    assert!(d.iter().all(|x| !x.is_error()));
+    let pm = Renderer::new(&e, 320, 180).render_at(0.2);
+    // The crate is #B5833F: plenty of brownish-orange pixels.
+    let n = pm.data().chunks(4).filter(|c| c[0] > 150 && c[1] > 100 && c[1] < 160 && c[2] < 100).count();
+    assert!(n > 300, "crate pixels: {}", n);
+}

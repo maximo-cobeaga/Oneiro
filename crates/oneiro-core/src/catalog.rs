@@ -17,7 +17,7 @@ pub const PLANNED_STYLES: &[&str] = &[];
 /// Parts of a vector (SVG) character, in the order they must be provided.
 pub const SVG_PARTS: &[&str] = &["head", "body", "arm", "leg"];
 
-pub const PROP_KINDS: &[&str] = &["counter", "stool", "table", "wall_clock", "window", "door", "pie_case"];
+pub const PROP_KINDS: &[&str] = &["counter", "stool", "table", "wall_clock", "window", "door", "pie_case", "model"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Slot {

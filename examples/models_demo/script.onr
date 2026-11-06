@@ -1,0 +1,16 @@
+oneiro 0.1
+project "Models Demo"
+style default: cutout_2d
+
+use character Marta
+use set room
+
+# Imported .obj files become props: scaled to `height`, standing on the floor, shaded like the 3D toon style.
+scene 1 "Crate and ball" in room {
+  time: day
+  place Marta at room.start
+  camera wide
+  Marta walks_to (3.5, 1.0)
+  Marta looks_at room.crate
+  wait 1s
+}

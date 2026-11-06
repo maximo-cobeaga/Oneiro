@@ -1,0 +1,5 @@
+name = "Models Demo"
+default_style = "cutout_2d"
+fps = 24
+width = 1280
+height = 720

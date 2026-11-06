@@ -1,0 +1,20 @@
+# Marta: a stubborn kid with a red beanie.
+character Marta {
+  rig: library.rigs.biped_cutout
+  build {
+    head:  library.heads.round    { size: 1.0, skin_tone: #F2C9A0 }
+    eyes:  library.eyes.ovals     { spacing: 0.4 }
+    mouth: library.mouths.visemes_basic
+    body:  library.bodies.kid     { height: 1.0 }
+  }
+  wardrobe {
+    default: [red_beanie, blue_coat, jeans, black_shoes]
+  }
+  voice { provider: file, pitch: 235 }
+  sheet {
+    age: 9
+    traits: [stubborn, impatient]
+    notes: "Never takes the beanie off."
+  }
+  styles { cutout_2d: auto }
+}

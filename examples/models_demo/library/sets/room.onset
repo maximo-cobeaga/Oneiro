@@ -1,0 +1,23 @@
+# A bare room with imported OBJ models. Coordinates are meters: x east, z north.
+set room {
+  size: 8m x 6m
+  height: 3m
+
+  palette {
+    wall: #DCE6EE
+    wall_alt: #CFDBE6
+    floor: #B9A88C
+    floor_alt: #A8977B
+    trim: #4A6FA5
+  }
+
+  anchors {
+    start: (-3.0, -1.0)
+    crate: { pos: (1.6, 0.6), solid: true }
+  }
+
+  props {
+    crate: library.props.model { model: "models/crate.obj", at: (1.6, 0.6), height: 0.9, yaw: 20, color: #B5833F, solid: true }
+    ball:  library.props.model { model: "models/ball.obj", at: (-1.8, 0.2), height: 0.5, color: #D64545 }
+  }
+}
