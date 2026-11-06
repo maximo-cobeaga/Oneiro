@@ -96,3 +96,28 @@ fn obj_models_show_up_in_the_render() {
     let n = pm.data().chunks(4).filter(|c| c[0] > 150 && c[1] > 100 && c[1] < 160 && c[2] < 100).count();
     assert!(n > 300, "crate pixels: {}", n);
 }
+
+#[test]
+fn open_sets_draw_sky_ground_backdrops_and_animated_sprites() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/beach").canonicalize().unwrap();
+    let mut d = vec![];
+    let p = Project::load(&root, &mut d);
+    let text = std::fs::read_to_string(root.join("script.onr")).unwrap();
+    let (e, d) = compile_source(&p, "script.onr", &text, &Lock::default());
+    assert!(d.iter().all(|x| !x.is_error()), "{:?}", d.iter().map(|x| x.render()).collect::<Vec<_>>());
+    let r = Renderer::new(&e, 320, 180);
+    let a = r.render_at(1.0);
+    let px = |x: usize, y: usize| {
+        let i = (y * 320 + x) * 4;
+        [a.data()[i], a.data()[i + 1], a.data()[i + 2]]
+    };
+    assert!(px(160, 5)[2] > 200 && px(160, 5)[0] < 140, "sky blue at the top: {:?}", px(160, 5));
+    assert!(px(160, 175)[0] > 200 && px(160, 175)[2] < 170, "sand at the bottom: {:?}", px(160, 175));
+    assert!(px(160, 70)[2] > px(160, 70)[0], "water from the north backdrop: {:?}", px(160, 70));
+    // Sprites move with the time, and the render is reproducible.
+    assert_eq!(a.data(), r.render_at(1.0).data());
+    assert_ne!(a.data(), r.render_at(1.4).data());
+    // The other sides are different pictures.
+    let east = r.render_at(8.0);
+    assert_ne!(east.data(), a.data());
+}

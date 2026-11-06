@@ -33,7 +33,7 @@ fn art_of(p: &SvgPart) -> Option<Art<'_>> {
 }
 
 /// Scales the colors of a premultiplied pixmap by the scene tint (night scenes are bluish).
-fn tinted(src: &Pixmap, tint: [f64; 3]) -> Pixmap {
+pub(crate) fn tinted(src: &Pixmap, tint: [f64; 3]) -> Pixmap {
     let mut out = src.clone();
     for px in out.data_mut().chunks_mut(4) {
         for c in 0..3 {

@@ -9,6 +9,8 @@ pub mod math;
 pub mod nav;
 pub mod obj;
 pub mod scaffold;
+pub mod scenery;
+pub mod svg_raster;
 pub mod physics;
 pub mod pose;
 pub mod project;

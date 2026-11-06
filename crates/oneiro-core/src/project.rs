@@ -130,6 +130,7 @@ impl Project {
                     "set" => {
                         let mut s = SetDef::from_block(b, &label, diags);
                         s.load_models(&self.root, &label, diags);
+                        s.load_scenery(&self.root, &label, diags);
                         self.sets.insert(s.name.clone(), s);
                     }
                     _ => {}

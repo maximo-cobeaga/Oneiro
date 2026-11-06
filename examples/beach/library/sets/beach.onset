@@ -1,0 +1,32 @@
+# An open set: no walls. A sky, sand, a painted backdrop on each side and sprites standing in the world.
+set beach {
+  kind: open
+  size: 16m x 12m
+
+  sky: [#4CC3FF, #FFF3C9]
+  ground: #F0D58C
+
+  backdrops {
+    north: "backgrounds/north.svg"
+    east:  "backgrounds/east.svg"
+    south: "backgrounds/south.svg"
+    west:  "backgrounds/west.svg"
+  }
+
+  anchors {
+    start: (-5.0, -2.0)
+    towel: (1.0, 0.5)
+    umbrella: (3.0, 1.5)
+    shore: (0.0, 4.0)
+  }
+
+  sprites {
+    palm_1:   { image: "scenery/palm.svg", at: (-6.5, 3.5), height: 5.0, anim: sway, speed: 0.8 }
+    palm_2:   { image: "scenery/palm.svg", at: (6.8, 4.5), height: 4.2, anim: sway, speed: 1.1, flip: true }
+    umbrella: { image: "scenery/umbrella.svg", at: (3.6, 2.0), height: 2.4 }
+    crab:     { image: "scenery/crab.svg", at: (-2.0, 1.2), height: 0.35, anim: bob, speed: 3.0, amount: 0.6 }
+    gull_1:   { image: "scenery/gull.svg", at: (-3.0, 7.0), height: 0.9, y: 4.5, anim: bob, speed: 1.4 }
+    gull_2:   { image: "scenery/gull.svg", at: (4.0, 8.0), height: 0.7, y: 5.5, anim: bob, speed: 1.0, flip: true }
+    sun:      { image: "scenery/sun.svg", at: (-8.0, 9.0), height: 1.8, y: 7.0, anim: pulse, speed: 0.7 }
+  }
+}
