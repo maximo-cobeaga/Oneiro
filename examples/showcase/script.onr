@@ -1,0 +1,44 @@
+oneiro 0.1
+project "Showcase"
+style default: cutout_2d
+
+# Everything Oneiro can draw, in one diner at dusk:
+#   Hero  = real 3D toon (cel shading, cloth cape)         Marta = ink pen drawing
+#   Blob  = rubber hose                                    Pip   = vector paper doll in 3D
+#   the diner's props are 3D meshes, plus an imported .obj crate, shadows follow the time of day.
+use character Hero
+use character Marta style ink
+use character Blob style rubber_hose
+use character Pip style toon_3d
+use set diner
+
+scene 1 "Dusk at the diner" in diner {
+  time: dusk
+  place Marta at diner.stool_2 facing diner.counter
+  place Blob at diner.counter
+  place Pip at diner.stool_3 facing diner.counter
+  place Hero at diner.door
+
+  music gallery_bgm volume 0.3 fade_in 1s
+  camera establishing wide from south move dolly_in for 4s
+  sfx door_bell at diner.door
+  Hero walks_to (0.0, -0.2)
+  Hero waves
+
+  transition dissolve for 0.8s
+  cut to medium on Marta
+  Marta (annoyed): "Another hero. Great."
+  Marta crosses_arms
+
+  transition wipe_left for 0.6s
+  cut to close on Blob
+  Blob (nervous): "Pie, anyone?"
+  Blob shrugs
+
+  transition fade_black for 1s
+  camera wide from east move dolly_out for 4s
+  Hero walks_to (-2.2, 0.4)
+  Pip waves
+  Blob walks_to (1.0, 1.2)
+  wait 1s
+}

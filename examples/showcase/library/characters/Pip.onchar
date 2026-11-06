@@ -1,0 +1,24 @@
+# Pip: a small robot drawn with its own vector parts (tier B).
+character Pip {
+  rig: library.rigs.biped_cutout
+  build {
+    head:  library.heads.round    { size: 1.0 }
+    eyes:  library.eyes.wide      { spacing: 0.42 }
+    mouth: library.mouths.visemes_basic
+    body:  library.bodies.kid     { height: 1.0 }
+  }
+  parts {
+    head { file: "library/parts/Pip/head.svg", height: 0.3, pivot: (0.5, 0.97) }
+    body { file: "library/parts/Pip/body.svg", height: 0.33, pivot: (0.5, 0.97) }
+    arm { file: "library/parts/Pip/arm.svg", height: 0.3, pivot: (0.5, 0.08) }
+    leg { file: "library/parts/Pip/leg.svg", height: 0.36, pivot: (0.5, 0.04) }
+    face { mode: auto, x: 0.5, y: 0.56, scale: 1 }
+  }
+  voice { provider: sapi, pitch: 300, voice: "Microsoft Zira Desktop", speed: 1.4 }
+  sheet {
+    age: 3
+    traits: [curious, loud]
+    notes: "A service robot that is always one step ahead of the joke."
+  }
+  styles { cutout_2d: auto }
+}

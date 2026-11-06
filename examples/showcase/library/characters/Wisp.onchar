@@ -1,0 +1,22 @@
+character Wisp {
+  rig: library.rigs.biped_cutout
+  build {
+    head:  library.heads.round
+    eyes:  library.eyes.dots
+    mouth: library.mouths.visemes_basic
+    body:  library.bodies.kid { height: 1 }
+  }
+  parts {
+    head { file: "library/parts/Wisp/head.svg", height: 0.32, pivot: (0.5, 0.97) }
+    body { file: "library/parts/Wisp/body.svg", height: 0.34, pivot: (0.5, 0.97) }
+    arm { file: "library/parts/Wisp/arm.svg", height: 0.26, pivot: (0.5, 0.08) }
+    leg { file: "library/parts/Wisp/leg.svg", height: 0.34, pivot: (0.5, 0.04) }
+    face { mode: auto, x: 0.5, y: 0.55, scale: 1.3 }
+  }
+  voice { provider: file, pitch: 340 }
+  sheet {
+    traits: [shy, nervous]
+    notes: "A shy little ghost who floats a bit nervously and fidgets with its bow tie."
+  }
+  styles { cutout_2d: auto }
+}

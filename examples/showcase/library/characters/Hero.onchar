@@ -1,0 +1,20 @@
+# Hero: a kid in a green hat and a red cape (cloth physics).
+character Hero {
+  rig: library.rigs.biped_cutout
+  style: toon_3d
+  build {
+    head:  library.heads.round    { size: 1.0, skin_tone: #E8B98C, hair: #3A2A1A }
+    eyes:  library.eyes.ovals     { spacing: 0.4 }
+    mouth: library.mouths.visemes_basic
+    body:  library.bodies.kid     { height: 1.0 }
+  }
+  toon3d { cape: #C02030 }
+  wardrobe { default: [green_hat, yellow_jacket, brown_pants, black_shoes] }
+  voice { provider: sapi, pitch: 210, voice: "Microsoft Sabina Desktop", speed: 0.95 }
+  sheet {
+    age: 10
+    traits: [brave, loud]
+    notes: "The cape always moves a beat behind."
+  }
+  styles { cutout_2d: auto }
+}
