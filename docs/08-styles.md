@@ -127,7 +127,7 @@ are always placed under `library/parts/<Name>/`, whatever paths the model wrote.
 
 ## What is not here yet
 
-- `toon_3d` (Phase 7) and `.onstyle` files for user-defined styles.
+- `.onstyle` files for user-defined styles (`toon_3d` arrived in Phase 7: see [10-toon3d.md](10-toon3d.md)).
 - Style-specific sets and props: the diner is drawn the same way in every style (only characters change).
 - A vector character has one pose per part: arms are rigid (no elbow bend) and legs do not fold when sitting
   (they rotate).
