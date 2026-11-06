@@ -2545,6 +2545,7 @@ dependencies = [
  "oneiro-voice",
  "rfd",
  "tiny-skia",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

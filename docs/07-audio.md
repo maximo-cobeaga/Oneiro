@@ -143,3 +143,8 @@ The guide that agents read now teaches `sfx`, `music`, `music stop` and the avai
   synthesizes them and patches the script text (`generate_script`).
 - `oneiro-core`: `AudioEvent` (kind, start, fades, stop, loop) and `Episode::render_audio()`, the single place where
   the soundtrack is built (export, IDE playback, `oneiro mix` and MCP all use it).
+
+## API keys from the interface
+Audio > Voice settings > ElevenLabs (and AI > Settings for the AI key) have a key field with **Save key** and **Forget**. A saved key is
+encrypted with your own Windows credentials (DPAPI) in `%APPDATA%\Oneiro\keys`, never stored in a project, and loaded at startup.
+On other systems it is a file only your user can read. The environment-variable route still works.
