@@ -1,6 +1,7 @@
 //! The start screen (new project, open project, recent projects, examples) and the small "new set" /
 //! "new episode" dialogs, so nothing needs a terminal.
 
+use crate::i18n::tr;
 use crate::app::{App, RightTab};
 use crate::theme;
 use eframe::egui::{self, RichText};
@@ -11,7 +12,7 @@ const MAX_RECENT: usize = 8;
 
 // ------------------------------------------------------------------ remembered projects
 
-fn config_dir() -> Option<PathBuf> {
+pub fn config_dir() -> Option<PathBuf> {
     if let Ok(d) = std::env::var("ONEIRO_CONFIG_DIR") {
         return Some(PathBuf::from(d));
     }
@@ -110,16 +111,24 @@ impl App {
         let mut want_new = false;
         let mut want_open = false;
         ui.vertical_centered(|ui| {
-            ui.add_space(ui.available_height() * 0.12);
-            ui.label(RichText::new("Oneiro Studio").size(38.0).strong().color(theme::ACCENT));
-            ui.label(RichText::new("write, direct and render animated series").size(15.0).weak());
+            ui.add_space(ui.available_height() * 0.08);
+            if self.logo.is_none() {
+                let pm = crate::logo::render(160);
+                let img = egui::ColorImage::from_rgba_premultiplied([160, 160], pm.data());
+                self.logo = Some(ui.ctx().load_texture("logo", img, egui::TextureOptions::LINEAR));
+            }
+            if let Some(t) = &self.logo {
+                ui.add(egui::Image::new(egui::load::SizedTexture::new(t.id(), egui::vec2(110.0, 110.0))));
+            }
+            ui.label(RichText::new(tr("Oneiro Studio")).size(38.0).strong().color(theme::ACCENT));
+            ui.label(RichText::new(tr("write, direct and render animated series")).size(15.0).weak());
             ui.add_space(22.0);
             ui.horizontal(|ui| {
                 ui.add_space((ui.available_width() - 360.0).max(0.0) / 2.0);
-                if ui.add_sized([170.0, 40.0], egui::Button::new(RichText::new("New project...").size(16.0))).clicked() {
+                if ui.add_sized([170.0, 40.0], egui::Button::new(RichText::new(tr("New project...")).size(16.0))).clicked() {
                     want_new = true;
                 }
-                if ui.add_sized([170.0, 40.0], egui::Button::new(RichText::new("Open project...").size(16.0))).clicked() {
+                if ui.add_sized([170.0, 40.0], egui::Button::new(RichText::new(tr("Open project...")).size(16.0))).clicked() {
                     want_open = true;
                 }
             });
@@ -128,7 +137,7 @@ impl App {
             let examples = find_examples();
             ui.allocate_ui(egui::vec2(520.0, 0.0), |ui| {
                 if !recent.is_empty() {
-                    ui.label(RichText::new("Recent").strong());
+                    ui.label(RichText::new(tr("Recent")).strong());
                     for p in &recent {
                         let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                         if ui.link(format!("{}    {}", name, p.display())).clicked() {
@@ -138,7 +147,7 @@ impl App {
                     ui.add_space(12.0);
                 }
                 if !examples.is_empty() {
-                    ui.label(RichText::new("Examples (changes are saved in place, copy first if you want to keep them)").strong());
+                    ui.label(RichText::new(tr("Examples (changes are saved in place, copy first if you want to keep them)")).strong());
                     for p in &examples {
                         let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                         if ui.link(name).clicked() {
@@ -173,15 +182,15 @@ impl App {
         let Some(mut d) = self.new_project.take() else { return };
         let mut keep = true;
         let mut create = false;
-        egui::Window::new("New project").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+        egui::Window::new(tr("New project")).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Title");
+                ui.label(tr("Title"));
                 ui.add(egui::TextEdit::singleline(&mut d.name).desired_width(300.0));
             });
             ui.horizontal(|ui| {
-                ui.label("Folder");
+                ui.label(tr("Folder"));
                 ui.label(RichText::new(d.parent.display().to_string()).weak());
-                if ui.button("Browse...").clicked() {
+                if ui.button(tr("Browse...")).clicked() {
                     let _ = std::fs::create_dir_all(&d.parent);
                     if let Some(p) = rfd::FileDialog::new().set_title("Where should the project folder go?").set_directory(&d.parent).pick_folder() {
                         d.parent = p;
@@ -200,10 +209,10 @@ impl App {
             }
             ui.horizontal(|ui| {
                 let ok = !scaffold::folder_name(&d.name).is_empty();
-                if ui.add_enabled(ok, egui::Button::new("Create")).clicked() {
+                if ui.add_enabled(ok, egui::Button::new(tr("Create"))).clicked() {
                     create = true;
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button(tr("Cancel")).clicked() {
                     keep = false;
                 }
             });
@@ -253,22 +262,22 @@ impl App {
         let title = if q.kind == QuickKind::Set { "New set" } else { "New episode" };
         egui::Window::new(title).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Name");
+                ui.label(tr("Name"));
                 ui.add(egui::TextEdit::singleline(&mut q.name).desired_width(220.0));
             });
-            ui.label(RichText::new("letters, digits and _ (it is also the file name)").weak().small());
+            ui.label(RichText::new(tr("letters, digits and _ (it is also the file name)")).weak().small());
             match q.kind {
                 QuickKind::Set => {
-                    ui.radio_value(&mut q.diner, false, "Bare room (8 x 6 m, a window, a door and a table)");
-                    ui.radio_value(&mut q.diner, true, "Diner (counter, stools, clock, pie case)");
+                    ui.radio_value(&mut q.diner, false, tr("Bare room (8 x 6 m, a window, a door and a table)"));
+                    ui.radio_value(&mut q.diner, true, tr("Diner (counter, stools, clock, pie case)"));
                 }
                 QuickKind::Episode => {
-                    egui::ComboBox::from_label("Set").selected_text(q.set.clone()).show_ui(ui, |ui| {
+                    egui::ComboBox::from_label(tr("Set")).selected_text(q.set.clone()).show_ui(ui, |ui| {
                         for s in &sets {
                             ui.selectable_value(&mut q.set, s.clone(), s);
                         }
                     });
-                    ui.label("Characters in the cast:");
+                    ui.label(tr("Characters in the cast:"));
                     for (n, on) in q.cast.iter_mut() {
                         ui.checkbox(on, n.as_str());
                     }
@@ -278,10 +287,10 @@ impl App {
                 ui.colored_label(egui::Color32::from_rgb(255, 120, 120), e);
             }
             ui.horizontal(|ui| {
-                if ui.button("Create").clicked() {
+                if ui.button(tr("Create")).clicked() {
                     create = true;
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button(tr("Cancel")).clicked() {
                     keep = false;
                 }
             });

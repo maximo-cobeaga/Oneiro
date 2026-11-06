@@ -79,6 +79,10 @@ pub fn footprints(set: &SetDef) -> Vec<(String, Obb)> {
     set.props.iter().filter_map(|p| footprint(p).map(|o| (p.name.clone(), o))).collect()
 }
 
+pub fn footprint_of(p: &PropInst) -> Option<Obb> {
+    footprint(p)
+}
+
 fn footprint(p: &PropInst) -> Option<Obb> {
     if p.wall.is_some() {
         return None;

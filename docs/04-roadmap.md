@@ -200,3 +200,10 @@ route for a story from zero is in [13-first-story.md](13-first-story.md).
 **Not verified:** the native folder-picker dialogs (Browse, Open project) were not clicked by me, only the screens and the
 creation logic were tested; the exe has no embedded file icon (the window icon is set in code); it is unsigned, so Windows
 SmartScreen may warn the first time.
+
+## Phase 15 results (open sets and the feedback round)
+
+Open sets with painted backdrops on four sides and animated sprites, an AI mode to paint scenarios, Spanish interface, logo,
+voice cloning and automatic voices, drawn-character fixes (face decal, neck/shoulders), camera occlusion avoidance, no terminal
+windows. See [14-open-sets.md](14-open-sets.md). **Not verified:** voice cloning against a real ElevenLabs account; AI-drawn
+scenarios with a real model (tested with a mock provider); how AI-drawn characters from the user's session look after the face fix.

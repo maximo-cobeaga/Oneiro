@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#341896"/><stop offset="0.5" stop-color="#D62896"/><stop offset="1" stop-color="#FF9628"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="128" cy="122" r="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE678" stop-opacity="0.6"/><stop offset="1" stop-color="#FFE678" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="bite"><rect width="256" height="256" fill="#fff"/><circle cx="160" cy="106" r="66" fill="#000"/></mask>
+    <clipPath id="badge"><rect width="256" height="256" rx="56"/></clipPath>
+  </defs>
+  <g clip-path="url(#badge)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <rect width="256" height="256" fill="url(#glow)"/>
+    <circle cx="122" cy="130" r="78" fill="#FFE882" mask="url(#bite)"/>
+    <path d="M142 96 L142 160 L196 128 Z" fill="#28D6C8"/>
+    <g fill="#FFFFFF"><path d="M60 32 Q62 50 80 52 Q62 54 60 72 Q58 54 40 52 Q58 50 60 32Z"/><path d="M204 206 Q207 224 221 206 Q205 207 204 189 Q202 207 187 206 Q202 205 204 189Z"/></g>
+    <path d="M206 35 Q208 46 219 48 Q208 50 206 61 Q204 50 193 48 Q204 46 206 35Z" fill="#78F0FF"/>
+    <path d="M44 165 Q46 174 55 176 Q46 178 44 187 Q42 178 33 176 Q42 174 44 165Z" fill="#FFF096"/>
+  </g>
+</svg>

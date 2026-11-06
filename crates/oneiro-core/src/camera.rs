@@ -373,7 +373,9 @@ pub fn solve(stmt: &CameraStmt, t: f64, env: &mut SolveEnv) -> Result<(CameraPos
     }
     if stmt.from.is_none() {
         // Automatic placement: never film a face through somebody else or a piece of furniture.
-        cam_xz = clear_view(env, cam_xz, &subject, sp, t);
+        // In a close-up the counter edge is below the frame, so only a much higher obstacle spoils it.
+        let margin = if matches!(shot.as_str(), "close" | "extreme_close" | "medium_close") { -0.15 } else { 0.10 };
+        cam_xz = clear_view(env, cam_xz, &subject, sp, t, center_y, margin);
     }
     let mut pose = CameraPose { pos: [cam_xz[0], center_y, cam_xz[1]], target, fov, roll };
     adjust_angle(&mut pose, angle);
@@ -429,7 +431,7 @@ fn seg_dist(a: V2, b: V2, p: V2) -> (f64, f64) {
 }
 
 /// True when something (another character, or furniture) stands between the camera and the subject.
-fn view_blocked(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64) -> bool {
+fn view_blocked(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64, eye_y: f64, margin: f64) -> bool {
     for a in env.actors.iter().filter(|a| a.name != subject) {
         let p = a.kin(t).pos;
         let (d, u) = seg_dist(cam, sp, p);
@@ -437,7 +439,18 @@ fn view_blocked(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64) -> bool 
             return true;
         }
     }
-    for (_, o) in crate::nav::footprints(env.set) {
+    for p in env.set.props.iter() {
+        let Some(o) = crate::nav::footprint_of(p) else { continue };
+        // Furniture only hides what is behind it when the camera looks through it near or below its top.
+        let top = match p.kind.as_str() {
+            "counter" => p.h.unwrap_or(1.0),
+            "table" => p.h.unwrap_or(0.74),
+            "stool" => p.h.unwrap_or(0.6),
+            _ => p.h.unwrap_or(1.0),
+        };
+        if eye_y > top + margin {
+            continue;
+        }
         if o.inflate(0.45).contains(sp) {
             continue; // the subject is at this furniture: it is not "in the way"
         }
@@ -449,8 +462,8 @@ fn view_blocked(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64) -> bool 
 }
 
 /// Moves the camera around the subject (keeping its distance) to the nearest spot with a clear view.
-fn clear_view(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64) -> V2 {
-    if !view_blocked(env, cam, subject, sp, t) {
+fn clear_view(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64, eye_y: f64, margin: f64) -> V2 {
+    if !view_blocked(env, cam, subject, sp, t, eye_y, margin) {
         return cam;
     }
     let (dx, dz) = (cam[0] - sp[0], cam[1] - sp[1]);
@@ -458,7 +471,7 @@ fn clear_view(env: &SolveEnv, cam: V2, subject: &str, sp: V2, t: f64) -> V2 {
         for sign in [1.0f64, -1.0] {
             let th = sign * (k as f64) * 20.0f64.to_radians();
             let c = [sp[0] + dx * th.cos() - dz * th.sin(), sp[1] + dx * th.sin() + dz * th.cos()];
-            if !view_blocked(env, c, subject, sp, t) {
+            if !view_blocked(env, c, subject, sp, t, eye_y, margin) {
                 return c;
             }
         }

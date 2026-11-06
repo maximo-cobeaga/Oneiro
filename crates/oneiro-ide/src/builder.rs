@@ -1,6 +1,7 @@
 //! Block-based character builder: pick parts and wardrobe from the library, tweak proportions
 //! and colors, preview the puppet turning, walking and talking, then save a `.onchar`.
 
+use crate::i18n::tr;
 use crate::app::App;
 use crate::workspace::Workspace;
 use eframe::egui::{self, Color32, RichText, TextureOptions};
@@ -128,14 +129,14 @@ impl App {
     pub fn ui_builder(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let Some(ws) = self.ws.as_ref() else {
-            ui.label("No project open.");
+            ui.label(tr("No project open."));
             return;
         };
         let names: Vec<String> = ws.project.characters.keys().cloned().collect();
         let mut pick: Option<String> = None;
         let mut start_new = false;
         ui.horizontal(|ui| {
-            let current = self.builder.draft.as_ref().map(|d| d.name.clone()).unwrap_or("(choose)".into());
+            let current = self.builder.draft.as_ref().map(|d| d.name.clone()).unwrap_or(crate::i18n::tr("(choose)").into());
             egui::ComboBox::from_id_salt("builder_pick").selected_text(current).show_ui(ui, |ui| {
                 for n in &names {
                     if ui.selectable_label(false, n).clicked() {
@@ -143,10 +144,10 @@ impl App {
                     }
                 }
             });
-            ui.label("or");
-            ui.add(egui::TextEdit::singleline(&mut self.builder.new_name).hint_text("name").desired_width(90.0));
+            ui.label(tr("or"));
+            ui.add(egui::TextEdit::singleline(&mut self.builder.new_name).hint_text(tr("name")).desired_width(90.0));
             let ok = valid_name(&self.builder.new_name) && !names.contains(&capitalize(&self.builder.new_name));
-            if ui.add_enabled(ok, egui::Button::new("+ New character")).on_hover_text("Letters, digits and _ (starting with a letter). The first letter becomes a capital.").clicked() {
+            if ui.add_enabled(ok, egui::Button::new(tr("+ New character"))).on_hover_text(tr("Letters, digits and _ (starting with a letter). The first letter becomes a capital.")).clicked() {
                 start_new = true;
             }
         });
@@ -159,7 +160,7 @@ impl App {
         }
         ui.separator();
         if self.builder.draft.is_none() {
-            ui.label("Pick a character to edit, or create a new one. Everything is built from library blocks - no drawing needed.");
+            ui.label(tr("Pick a character to edit, or create a new one. Everything is built from library blocks - no drawing needed."));
             return;
         }
 
@@ -196,35 +197,35 @@ impl App {
                     ui.add(egui::Image::new(egui::load::SizedTexture::new(t.id(), egui::vec2(220.0, 250.0))));
                 }
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("Preview").strong());
+                    ui.label(RichText::new(tr("Preview")).strong());
                     ui.add(egui::Slider::new(&mut b.turn, 0.0..=180.0).text("turn").suffix(" deg"));
-                    egui::ComboBox::from_label("expression").selected_text(b.expression.clone()).show_ui(ui, |ui| {
+                    egui::ComboBox::from_label(tr("expression")).selected_text(b.expression.clone()).show_ui(ui, |ui| {
                         for e in EXPRESSIONS {
                             ui.selectable_value(&mut b.expression, e.to_string(), *e);
                         }
                     });
-                    egui::ComboBox::from_label("mouth").selected_text(MOUTHS_UI[b.mouth].0).show_ui(ui, |ui| {
+                    egui::ComboBox::from_label(tr("mouth")).selected_text(MOUTHS_UI[b.mouth].0).show_ui(ui, |ui| {
                         for (i, (n, _)) in MOUTHS_UI.iter().enumerate() {
                             ui.selectable_value(&mut b.mouth, i, *n);
                         }
                     });
-                    ui.checkbox(&mut b.animate, "Animate (talk)");
-                    ui.checkbox(&mut b.walking, "Walk in place");
+                    ui.checkbox(&mut b.animate, tr("Animate (talk)"));
+                    ui.checkbox(&mut b.walking, tr("Walk in place"));
                 });
             });
             ui.separator();
 
             let d = b.draft.as_mut().unwrap();
             ui.horizontal(|ui| {
-                ui.label("Name");
+                ui.label(tr("Name"));
                 ui.label(RichText::new(&d.name).strong());
                 if b.is_new {
-                    ui.label(RichText::new("(new, not saved yet)").weak());
+                    ui.label(RichText::new(tr("(new, not saved yet)")).weak());
                 }
             });
 
             ui.horizontal(|ui| {
-                ui.label("Style");
+                ui.label(tr("Style"));
                 let shown = if d.style.is_empty() { "(episode default)".to_string() } else { d.style.clone() };
                 egui::ComboBox::from_id_salt("char_style").selected_text(shown).show_ui(ui, |ui| {
                     ui.selectable_value(&mut d.style, String::new(), "(episode default)");
@@ -233,7 +234,7 @@ impl App {
                     }
                 });
             });
-            ui.label(RichText::new("cutout_2d: paper cutout - rubber_hose: 1930s noodle limbs - clay: stop-motion plasticine - ink: pen drawing - toon_3d: real 3D. A script can override it with `use character X style Y`.").weak().small());
+            ui.label(RichText::new(tr("cutout_2d: paper cutout - rubber_hose: 1930s noodle limbs - clay: stop-motion plasticine - ink: pen drawing - toon_3d: real 3D. A script can override it with `use character X style Y`.")).weak().small());
             if d.style == "toon_3d" {
                 for (key, label, default) in [("cape", "cape (cloth physics)", Rgb(192, 32, 48)), ("tail", "tail (spring physics)", Rgb(224, 120, 42))] {
                     let slot = if key == "cape" { &mut d.toon3d.cape } else { &mut d.toon3d.tail };
@@ -247,14 +248,14 @@ impl App {
                     });
                     *slot = on.then(|| Rgb(arr[0], arr[1], arr[2]));
                 }
-                ui.label(RichText::new("3D characters are real geometry with cel shading and ink outlines; the cape and tail are simulated in every scene.").weak().small());
+                ui.label(RichText::new(tr("3D characters are real geometry with cel shading and ink outlines; the cape and tail are simulated in every scene.")).weak().small());
             }
             if d.has_svg() {
-                ui.label(RichText::new("This character is drawn from parts (library/parts): its head, body and clothes are those drawings, so they have no block controls here. Ask the AI tab to redraw it, or edit the SVG files. Eyes, voice, style and personality still apply.").color(Color32::from_rgb(120, 190, 240)).small());
+                ui.label(RichText::new(tr("This character is drawn from parts (library/parts): its head, body and clothes are those drawings, so they have no block controls here. Ask the AI tab to redraw it, or edit the SVG files. Eyes, voice, style and personality still apply.")).color(Color32::from_rgb(120, 190, 240)).small());
             }
             if !d.has_svg() {
-            egui::CollapsingHeader::new(RichText::new("Head").strong()).default_open(true).show(ui, |ui| {
-                egui::ComboBox::from_label("shape").selected_text(d.head.kind.clone()).show_ui(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Head")).strong()).default_open(true).show(ui, |ui| {
+                egui::ComboBox::from_label(tr("shape")).selected_text(d.head.kind.clone()).show_ui(ui, |ui| {
                     for k in HEADS {
                         ui.selectable_value(&mut d.head.kind, k.to_string(), *k);
                     }
@@ -266,25 +267,25 @@ impl App {
                 let skin = d.head.color("skin_tone", Rgb(242, 201, 160));
                 let mut arr = rgb_to_arr(skin);
                 ui.horizontal(|ui| {
-                    ui.label("skin");
+                    ui.label(tr("skin"));
                     if egui::color_picker::color_edit_button_srgb(ui, &mut arr).changed() {
                         d.head.colors.insert("skin_tone".into(), Rgb(arr[0], arr[1], arr[2]));
                     }
                     let hair = d.head.color("hair", Rgb(92, 60, 38));
                     let mut harr = rgb_to_arr(hair);
-                    ui.label("hair");
+                    ui.label(tr("hair"));
                     if egui::color_picker::color_edit_button_srgb(ui, &mut harr).changed() {
                         d.head.colors.insert("hair".into(), Rgb(harr[0], harr[1], harr[2]));
                     }
                     let mut bald = d.head.num("bald", 0.0) > 0.5;
-                    if ui.checkbox(&mut bald, "bald").changed() {
+                    if ui.checkbox(&mut bald, tr("bald")).changed() {
                         d.head.nums.insert("bald".into(), if bald { 1.0 } else { 0.0 });
                     }
                 });
             });
             }
-            egui::CollapsingHeader::new(RichText::new("Eyes").strong()).default_open(true).show(ui, |ui| {
-                egui::ComboBox::from_label("style").selected_text(d.eyes.kind.clone()).show_ui(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Eyes")).strong()).default_open(true).show(ui, |ui| {
+                egui::ComboBox::from_label(tr("style")).selected_text(d.eyes.kind.clone()).show_ui(ui, |ui| {
                     for k in EYES {
                         ui.selectable_value(&mut d.eyes.kind, k.to_string(), *k);
                     }
@@ -295,8 +296,8 @@ impl App {
                 }
             });
             if !d.has_svg() {
-            egui::CollapsingHeader::new(RichText::new("Body").strong()).default_open(true).show(ui, |ui| {
-                egui::ComboBox::from_label("build").selected_text(d.body.kind.clone()).show_ui(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Body")).strong()).default_open(true).show(ui, |ui| {
+                egui::ComboBox::from_label(tr("build")).selected_text(d.body.kind.clone()).show_ui(ui, |ui| {
                     for k in BODIES {
                         ui.selectable_value(&mut d.body.kind, k.to_string(), *k);
                     }
@@ -310,12 +311,12 @@ impl App {
                     d.body.nums.insert("width".into(), w);
                 }
             });
-            egui::CollapsingHeader::new(RichText::new("Wardrobe").strong()).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Wardrobe")).strong()).default_open(true).show(ui, |ui| {
                 for slot in [Slot::Hat, Slot::Top, Slot::Bottom, Slot::Shoes, Slot::Accessory] {
                     let current = d.wardrobe.iter().find(|w| wardrobe_item(w).map(|i| i.slot) == Some(slot)).cloned();
                     let mut choice = current.clone();
                     egui::ComboBox::from_label(slot_label(slot)).selected_text(choice.clone().unwrap_or("(none)".into())).show_ui(ui, |ui| {
-                        ui.selectable_value(&mut choice, None, "(none)");
+                        ui.selectable_value(&mut choice, None, tr("(none)"));
                         for it in WARDROBE.iter().filter(|i| i.slot == slot) {
                             ui.selectable_value(&mut choice, Some(it.name.to_string()), it.name);
                         }
@@ -329,8 +330,8 @@ impl App {
                 }
             });
             }
-            egui::CollapsingHeader::new(RichText::new("Voice and personality").strong()).default_open(false).show(ui, |ui| {
-                egui::ComboBox::from_label("voice engine").selected_text(d.voice_provider.clone()).show_ui(ui, |ui| {
+            egui::CollapsingHeader::new(RichText::new(tr("Voice and personality")).strong()).default_open(false).show(ui, |ui| {
+                egui::ComboBox::from_label(tr("voice engine")).selected_text(d.voice_provider.clone()).show_ui(ui, |ui| {
                     for (id, label) in [
                         ("file", "file: recorded or imported audio"),
                         ("demo", "demo: babble, preview only"),
@@ -343,24 +344,24 @@ impl App {
                     }
                 });
                 ui.horizontal(|ui| {
-                    ui.label("voice");
-                    ui.add(egui::TextEdit::singleline(&mut d.voice_id).hint_text("voice id or name (empty: engine default)").desired_width(250.0));
+                    ui.label(tr("voice"));
+                    ui.add(egui::TextEdit::singleline(&mut d.voice_id).hint_text(tr("voice id or name (empty: engine default)")).desired_width(250.0));
                 });
                 ui.add(egui::Slider::new(&mut d.voice_speed, 0.5..=2.0).text("speaking speed"));
                 ui.add(egui::Slider::new(&mut d.voice_pitch, 70.0..=400.0).text("pitch (Hz, demo engine)"));
                 ui.horizontal(|ui| {
-                    if ui.button("Preview voice").clicked() {
+                    if ui.button(tr("Preview voice")).clicked() {
                         b.voice_preview = true;
                     }
-                    ui.label(RichText::new("Engines and keys: Audio tab > Voice settings.").weak().small());
+                    ui.label(RichText::new(tr("Engines and keys: Audio tab > Voice settings.")).weak().small());
                 });
                 ui.horizontal(|ui| {
-                    ui.label("traits");
+                    ui.label(tr("traits"));
                     if ui.text_edit_singleline(&mut b.traits_text).changed() {
                         d.traits = b.traits_text.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
                     }
                 });
-                ui.label("notes for the AI");
+                ui.label(tr("notes for the AI"));
                 ui.text_edit_multiline(&mut d.notes);
             });
             ui.separator();
@@ -369,14 +370,14 @@ impl App {
             let mut save = false;
             let mut revert = false;
             ui.horizontal(|ui| {
-                if ui.add_enabled(dirty, egui::Button::new(RichText::new("Save to library").strong())).clicked() {
+                if ui.add_enabled(dirty, egui::Button::new(RichText::new(tr("Save to library")).strong())).clicked() {
                     save = true;
                 }
-                if ui.add_enabled(dirty && !b.is_new, egui::Button::new("Revert")).clicked() {
+                if ui.add_enabled(dirty && !b.is_new, egui::Button::new(tr("Revert"))).clicked() {
                     revert = true;
                 }
                 if dirty {
-                    ui.label(RichText::new("unsaved changes").color(Color32::from_rgb(230, 190, 70)));
+                    ui.label(RichText::new(tr("unsaved changes")).color(Color32::from_rgb(230, 190, 70)));
                 }
             });
             if !b.msg.is_empty() {

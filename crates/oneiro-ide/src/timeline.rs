@@ -1,6 +1,7 @@
 //! The timeline: script statements, camera shots and one lane group per character, with a
 //! scrubbable playhead. Clicking a block jumps to the script line that produced it.
 
+use crate::i18n::tr;
 use crate::app::{fmt_time, App};
 use crate::theme;
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke};
@@ -44,11 +45,11 @@ const LABEL_W: f32 = 108.0;
 impl App {
     pub fn ui_timeline(&mut self, ui: &mut egui::Ui) {
         let Some(ep) = self.ws.as_ref().map(|w| w.episode.clone()) else {
-            ui.label("No project open");
+            ui.label(tr("No project open"));
             return;
         };
         if ep.scenes.is_empty() {
-            ui.label("The timeline appears once the script has a scene.");
+            ui.label(tr("The timeline appears once the script has a scene."));
             return;
         }
         let total = ep.duration.max(0.5);
@@ -57,11 +58,11 @@ impl App {
             self.tl.view_start = 0.0;
         }
         ui.horizontal(|ui| {
-            if ui.small_button("Fit").clicked() {
+            if ui.small_button(tr("Fit")).clicked() {
                 self.tl.view_start = 0.0;
                 self.tl.view_len = total;
             }
-            ui.label(egui::RichText::new("wheel: zoom   shift+wheel / middle-drag: pan   click: seek / jump to script line").weak().small());
+            ui.label(egui::RichText::new(tr("wheel: zoom   shift+wheel / middle-drag: pan   click: seek / jump to script line")).weak().small());
         });
 
         // Rows: script, camera, one per distinct actor name.
@@ -123,8 +124,8 @@ impl App {
             let label_row = |r: usize, text: &str, color: Color32| {
                 painter.text(Pos2::new(rect.left() + 8.0, row_top(r) + ROW_H / 2.0), egui::Align2::LEFT_CENTER, text, egui::FontId::proportional(12.0), color);
             };
-            label_row(0, "Script", Color32::from_gray(190));
-            label_row(1, "Camera", Color32::from_rgb(190, 150, 255));
+            label_row(0, crate::i18n::tr("Script"), Color32::from_gray(190));
+            label_row(1, crate::i18n::tr("Camera"), Color32::from_rgb(190, 150, 255));
             for (i, n) in names.iter().enumerate() {
                 label_row(2 + i, n, Color32::from_rgb(250, 220, 120));
             }

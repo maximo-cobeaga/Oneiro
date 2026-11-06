@@ -2,6 +2,7 @@
 //! review a diff before anything touches your script. Works with any provider (Claude/Codex CLI
 //! under your own login, Anthropic API, local OpenAI-compatible servers).
 
+use crate::i18n::tr;
 use crate::app::{App, RightTab};
 use eframe::egui::{self, Color32, RichText};
 use oneiro_ai::config::ProviderKind;
@@ -13,6 +14,7 @@ use std::time::Instant;
 pub enum AiMode {
     Scene,
     Character,
+    Set,
 }
 
 pub enum Proposal {
@@ -20,6 +22,8 @@ pub enum Proposal {
     Script { text: String, valid: bool, problems: Vec<String>, diff: Vec<(DiffTag, String)>, state: ProposalState },
     /// `svgs` is non-empty for characters drawn as vector parts (tier B): (path in the project, SVG text).
     Character { source: String, name: String, svgs: Vec<(String, String)>, state: ProposalState },
+    /// An open set drawn by the AI: the `.onset` source and its pictures (path in the project, SVG text).
+    Set { source: String, name: String, files: Vec<(String, String)>, state: ProposalState },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -41,6 +45,7 @@ pub enum AiMsg {
     Scene(Result<SceneResult, String>, String),
     Character(Result<CharacterResult, String>, String),
     Parts(Result<oneiro_ai::PartsResult, String>, String),
+    Set(Result<oneiro_ai::SetResult, String>, String),
     Test(Result<String, String>),
 }
 
@@ -169,6 +174,7 @@ impl App {
                         AiMode::Scene => AiMsg::Scene(Err(e), request),
                         AiMode::Character if parts => AiMsg::Parts(Err(e), request),
                         AiMode::Character => AiMsg::Character(Err(e), request),
+                        AiMode::Set => AiMsg::Set(Err(e), request),
                     });
                     c2.request_repaint();
                     return;
@@ -188,6 +194,7 @@ impl App {
                 }
                 AiMode::Character if parts => AiMsg::Parts(oneiro_ai::direct_character_parts(provider.as_ref(), &project, &request, &history, &opts, &mut progress), request),
                 AiMode::Character => AiMsg::Character(oneiro_ai::direct_character(provider.as_ref(), &project, &request, &history, &opts, &mut progress), request),
+                AiMode::Set => AiMsg::Set(oneiro_ai::direct_set(provider.as_ref(), &project, &request, &history, &opts, &mut progress), request),
             };
             let _ = tx.send(msg);
             c2.request_repaint();
@@ -239,7 +246,7 @@ impl App {
             AiMsg::Progress(_) => {}
             AiMsg::Test(Ok(t)) => self.ai.chat.push(ChatItem::Info(format!("Connection OK. {}", t))),
             AiMsg::Test(Err(e)) => self.ai.chat.push(ChatItem::Error(e)),
-            AiMsg::Scene(Err(e), _) | AiMsg::Character(Err(e), _) | AiMsg::Parts(Err(e), _) => self.ai.chat.push(ChatItem::Error(e)),
+            AiMsg::Scene(Err(e), _) | AiMsg::Character(Err(e), _) | AiMsg::Parts(Err(e), _) | AiMsg::Set(Err(e), _) => self.ai.chat.push(ChatItem::Error(e)),
             AiMsg::Scene(Ok(r), request) => {
                 let footer = format!("{} model call(s), {:.0}s{}", r.rounds, elapsed, if r.usage.0 + r.usage.1 > 0 { format!(", {} in / {} out tokens", r.usage.0, r.usage.1) } else { String::new() });
                 let problems: Vec<String> = r.diagnostics.iter().filter(|d| d.is_error()).map(|d| d.render()).collect();
@@ -253,6 +260,26 @@ impl App {
                 };
                 self.ai.history.push(Turn { user: request, assistant: r.reply.clone() });
                 self.ai.chat.push(ChatItem::Ai { text: r.reply, notes: r.notes, proposal, footer });
+            }
+            AiMsg::Set(Ok(r), request) => {
+                let footer = format!("{} model call(s), {:.0}s", r.rounds, elapsed);
+                let proposal = match &r.source {
+                    Some(src) if r.valid => Proposal::Set { source: src.clone(), name: r.name.clone(), files: r.files.clone(), state: ProposalState::Pending },
+                    _ => Proposal::None,
+                };
+                let mut text = r.reply.clone();
+                if !r.valid {
+                    text.push_str("
+
+The scenery still has problems:
+");
+                    for d in r.diagnostics.iter().filter(|d| d.is_error()) {
+                        text.push_str(&format!("{}
+", d.render()));
+                    }
+                }
+                self.ai.history.push(Turn { user: request, assistant: r.reply });
+                self.ai.chat.push(ChatItem::Ai { text, notes: vec![], proposal, footer });
             }
             AiMsg::Parts(Ok(r), request) => {
                 let footer = format!("{} model call(s), {:.0}s", r.rounds, elapsed);
@@ -343,7 +370,7 @@ impl App {
             if ui.button(if self.ai.show_settings { "Hide settings" } else { "Settings" }).clicked() {
                 self.ai.show_settings = !self.ai.show_settings;
             }
-            if ui.add_enabled(!self.ai_busy(), egui::Button::new("Test")).on_hover_text("Send a tiny request to check the connection").clicked() {
+            if ui.add_enabled(!self.ai_busy(), egui::Button::new(tr("Test"))).on_hover_text(tr("Send a tiny request to check the connection")).clicked() {
                 self.ai_test_connection(&ctx);
             }
         });
@@ -352,61 +379,61 @@ impl App {
                 let kind = self.ai.cfg.kind;
                 match kind {
                     ProviderKind::ClaudeCli | ProviderKind::CodexCli => {
-                        ui.label(RichText::new("Uses the CLI you already have installed and logged in (`claude` / `codex`), with your own subscription. Oneiro never sees your credentials.").weak().small());
+                        ui.label(RichText::new(tr("Uses the CLI you already have installed and logged in (`claude` / `codex`), with your own subscription. Oneiro never sees your credentials.")).weak().small());
                         ui.horizontal(|ui| {
-                            ui.label("model (optional)");
+                            ui.label(tr("model (optional)"));
                             ui.text_edit_singleline(&mut self.ai.cfg.model);
                         });
                     }
                     ProviderKind::AnthropicApi => {
                         ui.horizontal(|ui| {
-                            ui.label("model");
-                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.model).hint_text("claude-sonnet-5-5"));
+                            ui.label(tr("model"));
+                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.model).hint_text(tr("claude-sonnet-5-5")));
                         });
                         ui.horizontal(|ui| {
-                            ui.label("key env var");
-                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.api_key_env).hint_text("ANTHROPIC_API_KEY"));
+                            ui.label(tr("key env var"));
+                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.api_key_env).hint_text(tr("ANTHROPIC_API_KEY")));
                         });
                         ui.horizontal(|ui| {
-                            ui.label("or key (this session only)");
+                            ui.label(tr("or key (this session only)"));
                             ui.add(egui::TextEdit::singleline(&mut self.ai.session_key).password(true).desired_width(160.0));
                         });
-                        ui.label(RichText::new("Keys are never saved to disk.").weak().small());
+                        ui.label(RichText::new(tr("Keys are never saved to disk.")).weak().small());
                     }
                     ProviderKind::OpenAiCompatible => {
                         ui.horizontal(|ui| {
-                            ui.label("base URL");
+                            ui.label(tr("base URL"));
                             ui.text_edit_singleline(&mut self.ai.cfg.base_url);
                         });
                         ui.horizontal(|ui| {
-                            ui.label("model");
-                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.model).hint_text("llama3.1"));
+                            ui.label(tr("model"));
+                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.model).hint_text(tr("llama3.1")));
                         });
                         ui.horizontal(|ui| {
-                            ui.label("key env var (optional)");
+                            ui.label(tr("key env var (optional)"));
                             ui.text_edit_singleline(&mut self.ai.cfg.api_key_env);
                         });
-                        ui.checkbox(&mut self.ai.cfg.vision, "model can see images (enables visual self-check)");
-                        ui.label(RichText::new("Ollama: http://localhost:11434/v1   LM Studio: http://localhost:1234/v1").weak().small());
+                        ui.checkbox(&mut self.ai.cfg.vision, tr("model can see images (enables visual self-check)"));
+                        ui.label(RichText::new(tr("Ollama: http://localhost:11434/v1   LM Studio: http://localhost:1234/v1")).weak().small());
                     }
                     ProviderKind::CustomCli => {
                         ui.horizontal(|ui| {
-                            ui.label("command");
-                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.custom_command).hint_text("my-agent --flag"));
+                            ui.label(tr("command"));
+                            ui.add(egui::TextEdit::singleline(&mut self.ai.cfg.custom_command).hint_text(tr("my-agent --flag")));
                         });
-                        ui.label(RichText::new("The prompt is sent on stdin; the reply is read from stdout.").weak().small());
+                        ui.label(RichText::new(tr("The prompt is sent on stdin; the reply is read from stdout.")).weak().small());
                     }
                 }
-                ui.checkbox(&mut self.ai.cfg.self_check, "Visual self-check (the model looks at a contact sheet of the shots; needs image support)");
+                ui.checkbox(&mut self.ai.cfg.self_check, tr("Visual self-check (the model looks at a contact sheet of the shots; needs image support)"));
                 ui.add(egui::Slider::new(&mut self.ai.cfg.max_rounds, 1..=8).text("max correction rounds"));
                 ui.horizontal(|ui| {
-                    if ui.button("Save settings").clicked() {
+                    if ui.button(tr("Save settings")).clicked() {
                         match self.ai.cfg.save() {
                             Ok(_) => self.status = format!("Saved {}", oneiro_ai::config::config_path().display()),
                             Err(e) => self.status = e,
                         }
                     }
-                    if ui.button("Copy MCP setup command").on_hover_text("Lets Claude Code / Codex drive this project through the Oneiro MCP server").clicked() {
+                    if ui.button(tr("Copy MCP setup command")).on_hover_text(tr("Lets Claude Code / Codex drive this project through the Oneiro MCP server")).clicked() {
                         let cmd = self.mcp_setup_command();
                         ctx.copy_text(cmd);
                         self.status = "MCP setup command copied to the clipboard".into();
@@ -415,12 +442,13 @@ impl App {
             });
         }
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.ai.mode, AiMode::Scene, "Write / edit scenes");
-            ui.selectable_value(&mut self.ai.mode, AiMode::Character, "Design a character");
+            ui.selectable_value(&mut self.ai.mode, AiMode::Scene, tr("Write / edit scenes"));
+            ui.selectable_value(&mut self.ai.mode, AiMode::Character, tr("Design a character"));
+            ui.selectable_value(&mut self.ai.mode, AiMode::Set, tr("Paint a scenario"));
         });
         if self.ai.mode == AiMode::Character {
-            ui.checkbox(&mut self.ai.parts, "Draw it as vector parts (SVG) instead of library blocks")
-                .on_hover_text("The AI draws the head, body, arm and leg as SVG; the engine checks them and Oneiro animates and lip-syncs the result. Needs a capable model.");
+            ui.checkbox(&mut self.ai.parts, tr("Draw it as vector parts (SVG) instead of library blocks"))
+                .on_hover_text(tr("The AI draws the head, body, arm and leg as SVG; the engine checks them and Oneiro animates and lip-syncs the result. Needs a capable model."));
         }
         ui.separator();
 
@@ -436,17 +464,18 @@ impl App {
             let hint = match self.ai.mode {
                 AiMode::Scene => "What should happen? (Ctrl+Enter to send)",
                 AiMode::Character => "Describe the character: look, age, personality... (Ctrl+Enter to send)",
+                AiMode::Set => "Describe the place: a beach at sunset, a haunted forest, a busy street... (Ctrl+Enter to send)",
             };
             let out = egui::ScrollArea::vertical().max_height(130.0).id_salt("ai_input_scroll").show(ui, |ui| egui::TextEdit::multiline(&mut self.ai.input).desired_rows(3).desired_width(f32::INFINITY).hint_text(hint).show(ui)).inner;
             let ctrl_enter = out.response.has_focus() && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter));
             ui.horizontal(|ui| {
-                if ui.add_enabled(!self.ai_busy() && !self.ai.input.trim().is_empty(), egui::Button::new(RichText::new("Send").strong())).clicked() || (ctrl_enter && !self.ai_busy()) {
+                if ui.add_enabled(!self.ai_busy() && !self.ai.input.trim().is_empty(), egui::Button::new(RichText::new(tr("Send")).strong())).clicked() || (ctrl_enter && !self.ai_busy()) {
                     send = true;
                 }
-                if !self.ai.undo.is_empty() && ui.button("Undo AI change").clicked() {
+                if !self.ai.undo.is_empty() && ui.button(tr("Undo AI change")).clicked() {
                     self.ai_undo();
                 }
-                if ui.button("Clear chat").clicked() {
+                if ui.button(tr("Clear chat")).clicked() {
                     self.ai.chat.truncate(1);
                     self.ai.history.clear();
                 }
@@ -469,12 +498,13 @@ impl App {
         let mut apply_script: Option<(usize, String)> = None;
         let mut reject: Option<usize> = None;
         let mut apply_char: Option<(usize, String, String, Vec<(String, String)>)> = None;
+        let mut apply_set: Option<(usize, String, String, Vec<(String, String)>)> = None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
             for (i, item) in self.ai.chat.iter().enumerate() {
                 match item {
                     ChatItem::User(t) => {
                         egui::Frame::group(ui.style()).fill(Color32::from_rgb(40, 38, 62)).show(ui, |ui| {
-                            ui.label(RichText::new("You").strong().small());
+                            ui.label(RichText::new(tr("You")).strong().small());
                             ui.add(egui::Label::new(t.as_str()).wrap());
                         });
                     }
@@ -483,13 +513,13 @@ impl App {
                     }
                     ChatItem::Error(t) => {
                         egui::Frame::group(ui.style()).fill(Color32::from_rgb(70, 30, 30)).show(ui, |ui| {
-                            ui.label(RichText::new("Problem").strong().small());
+                            ui.label(RichText::new(tr("Problem")).strong().small());
                             ui.add(egui::Label::new(t.as_str()).wrap());
                         });
                     }
                     ChatItem::Ai { text, notes, proposal, footer } => {
                         egui::Frame::group(ui.style()).show(ui, |ui| {
-                            ui.label(RichText::new("Director").strong().small().color(Color32::from_rgb(170, 130, 255)));
+                            ui.label(RichText::new(tr("Director")).strong().small().color(Color32::from_rgb(170, 130, 255)));
                             if !text.is_empty() {
                                 ui.label(text);
                             }
@@ -503,40 +533,62 @@ impl App {
                                     let (add, rem) = diff_stats(&d);
                                     ui.horizontal(|ui| {
                                         if *valid {
-                                            ui.label(RichText::new("valid").color(Color32::from_rgb(120, 220, 150)));
+                                            ui.label(RichText::new(tr("valid")).color(Color32::from_rgb(120, 220, 150)));
                                         } else {
-                                            ui.label(RichText::new("has errors").color(Color32::from_rgb(240, 110, 100)));
+                                            ui.label(RichText::new(tr("has errors")).color(Color32::from_rgb(240, 110, 100)));
                                         }
                                         ui.label(format!("+{} -{} lines", add, rem));
                                     });
                                     for p in problems {
                                         ui.label(RichText::new(p).small().color(Color32::from_rgb(240, 150, 140)));
                                     }
-                                    egui::CollapsingHeader::new("Show changes").id_salt(("diff", i)).show(ui, |ui| {
+                                    egui::CollapsingHeader::new(tr("Show changes")).id_salt(("diff", i)).show(ui, |ui| {
                                         for (tag, line) in d.iter().filter(|(t, _)| *t != DiffTag::Same) {
                                             let (prefix, col) = if *tag == DiffTag::Added { ("+ ", Color32::from_rgb(130, 220, 150)) } else { ("- ", Color32::from_rgb(240, 130, 130)) };
                                             ui.label(RichText::new(format!("{}{}", prefix, line)).monospace().color(col));
                                         }
                                         if add + rem == 0 {
-                                            ui.label("No changes.");
+                                            ui.label(tr("No changes."));
                                         }
                                     });
                                     match state {
                                         ProposalState::Pending => {
                                             ui.horizontal(|ui| {
-                                                if ui.add_enabled(*valid, egui::Button::new(RichText::new("Apply to script").strong())).clicked() {
+                                                if ui.add_enabled(*valid, egui::Button::new(RichText::new(tr("Apply to script")).strong())).clicked() {
                                                     apply_script = Some((i, new_text.clone()));
                                                 }
-                                                if ui.button("Reject").clicked() {
+                                                if ui.button(tr("Reject")).clicked() {
                                                     reject = Some(i);
                                                 }
                                             });
                                         }
                                         ProposalState::Applied => {
-                                            ui.label(RichText::new("applied").weak());
+                                            ui.label(RichText::new(tr("applied")).weak());
                                         }
                                         ProposalState::Rejected => {
-                                            ui.label(RichText::new("rejected").weak());
+                                            ui.label(RichText::new(tr("rejected")).weak());
+                                        }
+                                    }
+                                }
+                                Proposal::Set { source, name, files, state } => {
+                                    ui.label(RichText::new(format!("scenario {} ({} pictures)", name, files.len())).strong());
+                                    ui.add(egui::Label::new(RichText::new(source).monospace().small()).wrap());
+                                    match state {
+                                        ProposalState::Pending => {
+                                            ui.horizontal(|ui| {
+                                                if ui.button(tr("Add to the library")).clicked() {
+                                                    apply_set = Some((i, name.clone(), source.clone(), files.clone()));
+                                                }
+                                                if ui.button(tr("Reject")).clicked() {
+                                                    reject = Some(i);
+                                                }
+                                            });
+                                        }
+                                        ProposalState::Applied => {
+                                            ui.label(RichText::new(tr("added to the library (Sets)")).weak());
+                                        }
+                                        ProposalState::Rejected => {
+                                            ui.label(RichText::new(tr("rejected")).weak());
                                         }
                                     }
                                 }
@@ -550,16 +602,16 @@ impl App {
                                                 if ui.button(label).clicked() {
                                                     apply_char = Some((i, name.clone(), source.clone(), svgs.clone()));
                                                 }
-                                                if ui.button("Reject").clicked() {
+                                                if ui.button(tr("Reject")).clicked() {
                                                     reject = Some(i);
                                                 }
                                             });
                                         }
                                         ProposalState::Applied => {
-                                            ui.label(RichText::new("opened in the builder (save it there)").weak());
+                                            ui.label(RichText::new(tr("opened in the builder (save it there)")).weak());
                                         }
                                         ProposalState::Rejected => {
-                                            ui.label(RichText::new("rejected").weak());
+                                            ui.label(RichText::new(tr("rejected")).weak());
                                         }
                                     }
                                 }
@@ -575,6 +627,26 @@ impl App {
             self.ai_apply_script(&text);
             if let Some(ChatItem::Ai { proposal: Proposal::Script { state, .. }, .. }) = self.ai.chat.get_mut(i) {
                 *state = ProposalState::Applied;
+            }
+        }
+        if let Some((i, name, source, files)) = apply_set {
+            let root = self.ws.as_ref().map(|w| w.root.clone());
+            if let Some(root) = root {
+                match oneiro_ai::sets::save_files(&root, &name, &source, &files) {
+                    Ok(path) => {
+                        if let Some(ws) = &mut self.ws {
+                            ws.reload_project();
+                            ws.recompile();
+                        }
+                        self.set_thumbs.clear();
+                        self.vp.invalidate();
+                        self.status = format!("Saved {} and its {} pictures. Use it with: use set {}", path.display(), files.len(), name);
+                        if let Some(ChatItem::Ai { proposal: Proposal::Set { state, .. }, .. }) = self.ai.chat.get_mut(i) {
+                            *state = ProposalState::Applied;
+                        }
+                    }
+                    Err(e) => self.status = format!("Could not save the scenario: {}", e),
+                }
             }
         }
         if let Some((i, name, source, svgs)) = apply_char {

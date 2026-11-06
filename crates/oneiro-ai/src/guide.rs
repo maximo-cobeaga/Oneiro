@@ -11,6 +11,8 @@ pub enum Mode {
     Character,
     /// A character drawn as four SVG parts (tier B).
     Parts,
+    /// An open set: backdrops and sprites drawn as SVG.
+    Set,
 }
 
 pub const LANGUAGE_GUIDE: &str = r#"# Oneiro language guide
@@ -146,6 +148,69 @@ Rules:
   `toon3d { cape: #C02030, tail: #E0782A }` adds a cloth cape and/or a springy tail (physics, 3D style only).
 - Be faithful to the user's description; make unspecified choices that fit the character's personality.
 "#;
+
+/// How to author an open set (a beach, a forest, a street) from SVG pictures.
+pub const SET_GUIDE: &str = r##"# Oneiro open sets (scenery drawn as pictures)
+
+A scenario is NOT a room: it is a sky, a ground, a painted BACKDROP on each of the four sides (so the camera can film
+from any side) and SPRITES (flat pictures standing in the world: trees, rocks, boats, birds, a sun) that always face the
+camera and can move. Like classic cartoons: painted backgrounds with a few animated things. Reply with ONE `set`
+block and one SVG block per picture it uses.
+
+```onset
+set beach {
+  kind: open
+  size: 16m x 12m
+  sky: [#4CC3FF, #FFF3C9]
+  ground: #F0D58C
+  backdrops {
+    north: "backdrop_north"
+    east: "backdrop_east"
+    south: "backdrop_south"
+    west: "backdrop_west"
+  }
+  anchors {
+    start: (-5.0, -2.0)
+    center: (0.0, 0.0)
+    shore: (0.0, 4.0)
+  }
+  sprites {
+    palm_1: { image: "sprite_palm", at: (-6.5, 3.5), height: 5.0, anim: sway, speed: 0.8 }
+    gull_1: { image: "sprite_gull", at: (-3.0, 7.0), height: 0.9, y: 4.5, anim: bob, speed: 1.4 }
+  }
+}
+```
+
+```svg backdrop_north
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 600"> ... </svg>
+```
+(one `svg NAME` block for every name used in `backdrops` and `image:`; a name is used once even if several sprites share it)
+
+Rules (the engine checks them and tells you what is wrong):
+- `kind: open`. `size` is the PLAY AREA in meters (usually 14m x 10m to 20m x 14m): where characters walk. x is east, z is
+  north, (0, 0) is the center. Anchors are named points inside it (at least `start` and `center`); scripts use
+  `place Marta at beach.start`, `walks_to beach.shore`, `camera wide from east`.
+- `sky: [top, horizon]` two colors (or one). `ground: #RRGGBB` the floor color. Both are flat; the backdrops go on top.
+- Backdrops: the four pictures stand around the play area, each seen from inside: `north` is what you see looking
+  north, and so on. They must be WIDE (viewBox ratio between 1.8 and 4.5; use `viewBox="0 0 1600 600"`). The BOTTOM edge of
+  the picture meets the ground at the horizon, so draw the scenery rising from the bottom and leave the sky area empty
+  (transparent): the sky gradient shows through. Fill the whole bottom with ground, water, hills or buildings; do not leave
+  a gap at the bottom. Make the four sides different but matching (a beach: sea to the north, cliffs east, jungle west,
+  a boardwalk with shops south). Where two sides meet, the pictures should not clash in height too much.
+- Sprites: `image: "NAME"`, `at: (x, z)` on the ground (stand them around and just outside the play area to give depth:
+  trees at the edges, a rock near the middle), `height` in meters (a tree 4-6, a person-sized thing 1.7, a crab 0.3, a
+  bird 0.8), `y` lift above the ground in meters (birds and suns 3-8), `flip: true` mirrors it. `anim` is one of
+  `none`, `sway` (trees in the wind, rocks about the base), `bob` (up and down: birds, boats, buoys), `pulse` (breathes:
+  a sun, a lamp), `spin` (turns in place: a windmill, a coin); `speed` (0.3-3) and `amount` (0.3-2) tune it. 6 to 14
+  sprites is plenty; animate only a few.
+- Each sprite picture is a standalone SVG with a `viewBox`; the drawing FILLS it and its bottom edge is where it touches
+  the ground (so leave no empty space at the bottom).
+- Allowed SVG: `svg g path rect circle ellipse line polyline polygon` with `fill`, `stroke`, `stroke-width`, `opacity`,
+  `transform`. Colors as `#RRGGBB`. NOT allowed: gradients, filters, text, images, `use`, scripts, CSS, clip paths, masks.
+  Use bold flat colors with a dark outline (stroke 4-6 units on a 1600-wide backdrop) and a few shapes per object:
+  colorful, simple, readable, in the style of a modern cartoon. At most 600 shapes per picture.
+- Picture names: letters, digits and underscores, NO path and NO extension; Oneiro saves the files for you.
+"##;
 
 /// How to author a character from vector parts (tier B).
 pub const PARTS_GUIDE: &str = r##"# Oneiro vector characters (drawn parts)
@@ -342,6 +407,12 @@ pub fn system_prompt(project: &Project, mode: Mode) -> String {
             s.push_str("You are the character illustrator inside Oneiro, a language and studio for animated series. You DRAW characters as SVG parts.\n\n");
             s.push_str(PARTS_GUIDE);
         }
+        Mode::Set => {
+            s.push_str("You are the scenery painter inside Oneiro, a language and studio for animated series. You design scenarios as painted backdrops and sprites.
+
+");
+            s.push_str(SET_GUIDE);
+        }
     }
     s.push('\n');
     s.push_str(&vocabulary_text());
@@ -358,6 +429,10 @@ pub fn system_prompt(project: &Project, mode: Mode) -> String {
         ),
         Mode::Parts => s.push_str(
             "Reply with at most two short sentences describing the design, then exactly ONE fenced block marked ```onchar with the `character` definition and FOUR fenced blocks marked ```svg head, ```svg body, ```svg arm and ```svg leg. Nothing else.\n",
+        ),
+        Mode::Set => s.push_str(
+            "Reply with at most two short sentences describing the scenario, then exactly ONE fenced block marked ```onset with the `set` definition and one fenced block marked ```svg NAME for every picture it uses. Nothing else.
+",
         ),
     }
     s

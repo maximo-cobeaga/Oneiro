@@ -158,13 +158,13 @@ fn any_prop_can_be_made_solid_or_walkable() {
 }
 
 #[test]
-fn automatic_close_ups_never_film_through_the_counter_or_a_person() {
+fn automatic_shots_never_film_through_the_counter_or_a_person() {
     // Blob behind the counter, Marta on a stool in front of it: the default shot looks toward Blob, across the counter.
     let ep = scene("  place Marta at diner.stool_2 facing diner.counter
   place Blob at diner.door
   camera wide
   Blob walks_to (0.9, 3.6)
-  cut to close on Marta
+  cut to full on Marta
   wait 1s");
     let sc = &ep.scenes[0];
     let cam = sc.cameras.last().unwrap().base.pos;
